@@ -1,4 +1,4 @@
-module task_manager
+module Task_Manager
 
 go 1.21.1
 

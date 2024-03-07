@@ -1,6 +1,5 @@
 package main
 
-//goland:noinspection Annotator,Annotator,Annotator
 import (
 	"database/sql"
 	"encoding/json"
@@ -34,7 +33,7 @@ func initDatabase() {
 
 	_, err = db.Exec(`
 		CREATE TABLE IF NOT EXISTS tasks (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			id INTEGER PRIMARY KEY,
 			description TEXT
 		);
 	`)

@@ -1,6 +1,5 @@
 package main
 
-//goland:noinspection ALL,Annotator,Annotator
 import (
 	"database/sql"
 	"fmt"
