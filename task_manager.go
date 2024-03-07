@@ -12,8 +12,10 @@ import (
 )
 
 type Task struct {
-	ID          int    `json:"id"`
-	Description string `json:"description"`
+	ID        int    `json:"id"`
+	Name      string `json:"name"`
+	DueDate   string `json:"due_date"`
+	Completed bool   `json:"completed"`
 }
 
 var tasks []Task
@@ -34,7 +36,9 @@ func initDatabase() {
 	_, err = db.Exec(`
 		CREATE TABLE IF NOT EXISTS tasks (
 			id INTEGER PRIMARY KEY,
-			description TEXT
+			name TEXT,
+			due_date DATE,
+			completed BOOLEAN
 		);
 	`)
 	if err != nil {
@@ -67,9 +71,15 @@ func getTasks(w http.ResponseWriter, _ *http.Request) {
 }
 
 func createTask(w http.ResponseWriter, r *http.Request) {
-	description := r.Header.Get("INFO")
-	if description == "" {
-		http.Error(w, "Missing description header", http.StatusBadRequest)
+	name := r.Header.Get("name")
+	if name == "" {
+		http.Error(w, "Missing name header", http.StatusBadRequest)
+		return
+	}
+
+	dueDate := r.Header.Get("due_date")
+	if dueDate == "" {
+		http.Error(w, "Missing due date header", http.StatusBadRequest)
 		return
 	}
 
@@ -80,17 +90,23 @@ func createTask(w http.ResponseWriter, r *http.Request) {
 	}
 	defer db.Close()
 
-	result, err := db.Exec("INSERT INTO tasks(description) VALUES(?)", description)
+	result, err := db.Exec("INSERT INTO tasks(name, due_date, completed) VALUES(?, ?, ?)", name, dueDate, false)
 	if err != nil {
 		http.Error(w, "Error inserting task", http.StatusInternalServerError)
 		return
 	}
 
-	id, _ := result.LastInsertId()
+	id, err := result.LastInsertId()
+	if err != nil {
+		http.Error(w, "Error getting last inserted ID", http.StatusInternalServerError)
+		return
+	}
 
 	task := Task{
-		ID:          int(id),
-		Description: description,
+		ID:        int(id),
+		Name:      name,
+		DueDate:   dueDate,
+		Completed: false,
 	}
 	tasks = append(tasks, task)
 
@@ -111,9 +127,10 @@ func updateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	description := r.Header.Get("INFO")
-	if description == "" {
-		http.Error(w, "Missing description header", http.StatusBadRequest)
+	completedHeader := r.Header.Get("completed")
+	completed, err := strconv.ParseBool(completedHeader)
+	if err != nil {
+		http.Error(w, "Invalid completed header", http.StatusBadRequest)
 		return
 	}
 
@@ -124,7 +141,7 @@ func updateTask(w http.ResponseWriter, r *http.Request) {
 	}
 	defer db.Close()
 
-	_, err = db.Exec("UPDATE tasks SET description=? WHERE id=?", description, id)
+	_, err = db.Exec("UPDATE tasks SET completed=? WHERE id=?", completed, id)
 	if err != nil {
 		http.Error(w, "Error updating task", http.StatusInternalServerError)
 		return
@@ -132,7 +149,7 @@ func updateTask(w http.ResponseWriter, r *http.Request) {
 
 	for i, task := range tasks {
 		if task.ID == id {
-			tasks[i].Description = description
+			tasks[i].Completed = completed
 			break
 		}
 	}
@@ -161,7 +178,7 @@ func deleteTask(w http.ResponseWriter, r *http.Request) {
 	}
 	defer db.Close()
 
-	_, err = db.Exec("UPDATE tasks SET description='' WHERE id=?", id)
+	_, err = db.Exec("UPDATE tasks SET name='', due_date=NULL, completed=false WHERE id=?", id)
 	if err != nil {
 		http.Error(w, "Error deleting task", http.StatusInternalServerError)
 		return
@@ -169,13 +186,15 @@ func deleteTask(w http.ResponseWriter, r *http.Request) {
 
 	for i, task := range tasks {
 		if task.ID == id {
-			tasks[i].Description = ""
+			tasks[i].Name = ""
+			tasks[i].DueDate = ""
+			tasks[i].Completed = false
 			break
 		}
 	}
 
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, "Task description cleared successfully")
+	fmt.Fprintf(w, "Task cleared successfully")
 }
 
 func getTaskByID(w http.ResponseWriter, r *http.Request) {
@@ -198,16 +217,22 @@ func getTaskByID(w http.ResponseWriter, r *http.Request) {
 	}
 	defer db.Close()
 
-	var description string
-	err = db.QueryRow("SELECT description FROM tasks WHERE id=?", id).Scan(&description)
+	var (
+		name      string
+		dueDate   string
+		completed bool
+	)
+	err = db.QueryRow("SELECT name, due_date, completed FROM tasks WHERE id=?", id).Scan(&name, &dueDate, &completed)
 	if err != nil {
 		http.Error(w, "Task not found", http.StatusNotFound)
 		return
 	}
 
 	task := Task{
-		ID:          id,
-		Description: description,
+		ID:        id,
+		Name:      name,
+		DueDate:   dueDate,
+		Completed: completed,
 	}
 
 	w.Header().Set("Content-Type", "application/json")

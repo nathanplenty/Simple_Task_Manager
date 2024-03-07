@@ -18,7 +18,9 @@ func main() {
 	_, err = db.Exec(`
 		CREATE TABLE IF NOT EXISTS tasks (
 			id INTEGER PRIMARY KEY,
-			description TEXT NOT NULL
+			name TEXT NOT NULL,
+			due_date DATE,
+			completed BOOLEAN
 		);
 	`)
 	if err != nil {
