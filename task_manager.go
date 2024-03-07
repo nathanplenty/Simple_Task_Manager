@@ -1,11 +1,15 @@
 package main
 
+//goland:noinspection Annotator,Annotator,Annotator
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"strconv"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
 type Task struct {
@@ -16,8 +20,27 @@ type Task struct {
 var tasks []Task
 
 func main() {
+	initDatabase()
 	http.HandleFunc("/tasks", handleTasks)
 	log.Fatal(http.ListenAndServe(":8080", nil))
+}
+
+func initDatabase() {
+	db, err := sql.Open("sqlite3", "./tasks.db")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS tasks (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			description TEXT
+		);
+	`)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 func handleTasks(w http.ResponseWriter, r *http.Request) {
@@ -51,8 +74,23 @@ func createTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	db, err := sql.Open("sqlite3", "./tasks.db")
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	defer db.Close()
+
+	result, err := db.Exec("INSERT INTO tasks(description) VALUES(?)", description)
+	if err != nil {
+		http.Error(w, "Error inserting task", http.StatusInternalServerError)
+		return
+	}
+
+	id, _ := result.LastInsertId()
+
 	task := Task{
-		ID:          len(tasks),
+		ID:          int(id),
 		Description: description,
 	}
 	tasks = append(tasks, task)
@@ -69,7 +107,7 @@ func updateTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	id, err := strconv.Atoi(idHeader)
-	if err != nil || id < 0 || id >= len(tasks) {
+	if err != nil {
 		http.Error(w, "Invalid ID", http.StatusBadRequest)
 		return
 	}
@@ -80,7 +118,25 @@ func updateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tasks[id].Description = description
+	db, err := sql.Open("sqlite3", "./tasks.db")
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	defer db.Close()
+
+	_, err = db.Exec("UPDATE tasks SET description=? WHERE id=?", description, id)
+	if err != nil {
+		http.Error(w, "Error updating task", http.StatusInternalServerError)
+		return
+	}
+
+	for i, task := range tasks {
+		if task.ID == id {
+			tasks[i].Description = description
+			break
+		}
+	}
 
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, "Task updated successfully")
@@ -94,15 +150,33 @@ func deleteTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	id, err := strconv.Atoi(idHeader)
-	if err != nil || id < 0 || id >= len(tasks) {
+	if err != nil {
 		http.Error(w, "Invalid ID", http.StatusBadRequest)
 		return
 	}
 
-	tasks[id].Description = ""
+	db, err := sql.Open("sqlite3", "./tasks.db")
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	defer db.Close()
+
+	_, err = db.Exec("UPDATE tasks SET description='' WHERE id=?", id)
+	if err != nil {
+		http.Error(w, "Error deleting task", http.StatusInternalServerError)
+		return
+	}
+
+	for i, task := range tasks {
+		if task.ID == id {
+			tasks[i].Description = ""
+			break
+		}
+	}
 
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, "Task deleted successfully")
+	fmt.Fprintf(w, "Task description cleared successfully")
 }
 
 func getTaskByID(w http.ResponseWriter, r *http.Request) {
@@ -118,13 +192,25 @@ func getTaskByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	for _, task := range tasks {
-		if task.ID == id {
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(task)
-			return
-		}
+	db, err := sql.Open("sqlite3", "./tasks.db")
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	defer db.Close()
+
+	var description string
+	err = db.QueryRow("SELECT description FROM tasks WHERE id=?", id).Scan(&description)
+	if err != nil {
+		http.Error(w, "Task not found", http.StatusNotFound)
+		return
 	}
 
-	http.Error(w, "Task not found", http.StatusNotFound)
+	task := Task{
+		ID:          id,
+		Description: description,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(task)
 }
