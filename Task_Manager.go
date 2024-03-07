@@ -23,7 +23,11 @@ func main() {
 func handleTasks(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		getTasks(w, r)
+		if r.Header.Get("ID") != "" {
+			getTaskByID(w, r)
+		} else {
+			getTasks(w, r)
+		}
 	case http.MethodPost:
 		createTask(w, r)
 	case http.MethodPatch:
@@ -99,4 +103,28 @@ func deleteTask(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, "Task deleted successfully")
+}
+
+func getTaskByID(w http.ResponseWriter, r *http.Request) {
+	idHeader := r.Header.Get("ID")
+	if idHeader == "" {
+		http.Error(w, "Missing ID header", http.StatusBadRequest)
+		return
+	}
+
+	id, err := strconv.Atoi(idHeader)
+	if err != nil {
+		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		return
+	}
+
+	for _, task := range tasks {
+		if task.ID == id {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(task)
+			return
+		}
+	}
+
+	http.Error(w, "Task not found", http.StatusNotFound)
 }
