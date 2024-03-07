@@ -9,6 +9,10 @@ import (
 	"strconv"
 )
 
+type App struct {
+	db *sql.DB
+}
+
 type Task struct {
 	ID        int    `json:"id"`
 	Name      string `json:"name"`
@@ -16,24 +20,16 @@ type Task struct {
 	Completed bool   `json:"completed"`
 }
 
-var tasks []Task
-
-func main() {
-	initDatabase()
-	http.HandleFunc("/tasks", handleTasks)
-	log.Fatal(http.ListenAndServe(":8080", nil))
-}
-
-func initDatabase() {
-	db, err := sql.Open("sqlite3", "./tasks.db")
+func (app *App) initDatabase() {
+	var err error
+	app.db, err = sql.Open("sqlite3", "./tasks.db")
 	if err != nil {
 		log.Fatalf("Error opening database connection: %v", err)
 	}
-	defer db.Close()
-	_, err = db.Exec(`
+	_, err = app.db.Exec(`
 		CREATE TABLE IF NOT EXISTS tasks (
 			id INTEGER PRIMARY KEY,
-			name TEXT,
+			name TEXT NOT NULL,
 			due_date DATE,
 			completed BOOLEAN
 		);
@@ -44,39 +40,67 @@ func initDatabase() {
 	log.Println("Database initiated successfully")
 }
 
-func handleTasks(w http.ResponseWriter, r *http.Request) {
+func main() {
+	app := &App{}
+	app.initDatabase()
+	http.HandleFunc("/tasks", app.handleTasks)
+	log.Fatal(http.ListenAndServe(":8080", nil))
+}
+
+func (app *App) handleTasks(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		if r.Header.Get("ID") != "" {
-			getTaskByID(w, r)
+			app.getTaskByID(w, r)
 		} else {
-			getTasks(w, r)
+			app.getTasks(w, r)
 		}
 	case http.MethodPost:
-		createTask(w, r)
+		app.createTask(w, r)
 	case http.MethodPatch:
-		updateTask(w, r)
+		app.updateTask(w, r)
 	case http.MethodDelete:
-		deleteTask(w, r)
+		app.deleteTask(w, r)
 	default:
 		log.Printf("Method %s not allowed", r.Method)
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
 }
 
-func getTasks(w http.ResponseWriter, _ *http.Request) {
+func (app *App) getTasks(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	err := json.NewEncoder(w).Encode(tasks)
+	var tasks []Task
+	rows, err := app.db.Query("SELECT id, name, due_date, completed FROM tasks")
 	if err != nil {
+		log.Printf("Error querying tasks from database: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var task Task
+		err = rows.Scan(&task.ID, &task.Name, &task.DueDate, &task.Completed)
+		if err != nil {
+			log.Printf("Error scanning task row: %v", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+		tasks = append(tasks, task)
+	}
+	if err = rows.Err(); err != nil {
+		log.Printf("Error iterating over task rows: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if err = json.NewEncoder(w).Encode(tasks); err != nil {
 		log.Printf("Error encoding tasks to JSON: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 	log.Println("Tasks gathered successfully")
-	_, _ = w.Write([]byte("Tasks gathered successfully"))
 }
 
-func createTask(w http.ResponseWriter, r *http.Request) {
+func (app *App) createTask(w http.ResponseWriter, r *http.Request) {
 	name := r.Header.Get("name")
 	if name == "" {
 		log.Println("Missing name header")
@@ -89,14 +113,7 @@ func createTask(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Missing due date header", http.StatusBadRequest)
 		return
 	}
-	db, err := sql.Open("sqlite3", "./tasks.db")
-	if err != nil {
-		log.Printf("Internal server error: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-	defer db.Close()
-	result, err := db.Exec("INSERT INTO tasks(name, due_date, completed) VALUES(?, ?, ?)", name, dueDate, false)
+	result, err := app.db.Exec("INSERT INTO tasks(name, due_date, completed) VALUES(?, ?, ?)", name, dueDate, false)
 	if err != nil {
 		log.Printf("Error inserting task: %v", err)
 		http.Error(w, "Error inserting task", http.StatusInternalServerError)
@@ -114,13 +131,16 @@ func createTask(w http.ResponseWriter, r *http.Request) {
 		DueDate:   dueDate,
 		Completed: false,
 	}
-	tasks = append(tasks, task)
+	if err = json.NewEncoder(w).Encode(task); err != nil {
+		log.Printf("Error encoding task to JSON: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
 	w.WriteHeader(http.StatusCreated)
 	log.Println("Task created successfully")
-	_, _ = w.Write([]byte("Task created successfully"))
 }
 
-func updateTask(w http.ResponseWriter, r *http.Request) {
+func (app *App) updateTask(w http.ResponseWriter, r *http.Request) {
 	idHeader := r.Header.Get("ID")
 	if idHeader == "" {
 		log.Println("Missing ID header")
@@ -140,44 +160,29 @@ func updateTask(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid completed header", http.StatusBadRequest)
 		return
 	}
-	db, err := sql.Open("sqlite3", "./tasks.db")
-	if err != nil {
-		log.Printf("Internal server error: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-	defer db.Close()
-	var existingName string
-	err = db.QueryRow("SELECT name FROM tasks WHERE id=?", id).Scan(&existingName)
-	if err != nil {
-		log.Printf("Error retrieving task to user name: %v", err)
-		http.Error(w, "Error retrieving task to user name", http.StatusInternalServerError)
-		return
-	}
-	name := r.Header.Get("name")
-	if name != existingName {
-		log.Println("Provided name does not match existing user name")
-		http.Error(w, "Provided name does not match existing user name", http.StatusBadRequest)
-		return
-	}
-	_, err = db.Exec("UPDATE tasks SET completed=? WHERE id=?", completed, id)
+	result, err := app.db.Exec("UPDATE tasks SET completed=? WHERE id=?", completed, id)
 	if err != nil {
 		log.Printf("Error updating task: %v", err)
 		http.Error(w, "Error updating task", http.StatusInternalServerError)
 		return
 	}
-	for i, task := range tasks {
-		if task.ID == id {
-			tasks[i].Completed = completed
-			break
-		}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		log.Printf("Error getting rows affected: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if rowsAffected == 0 {
+		log.Println("Task not found")
+		http.Error(w, "Task not found", http.StatusNotFound)
+		return
 	}
 	w.WriteHeader(http.StatusOK)
 	log.Println("Task updated successfully")
 	_, _ = w.Write([]byte("Task updated successfully"))
 }
 
-func deleteTask(w http.ResponseWriter, r *http.Request) {
+func (app *App) deleteTask(w http.ResponseWriter, r *http.Request) {
 	idHeader := r.Header.Get("ID")
 	if idHeader == "" {
 		log.Println("Missing ID header")
@@ -186,50 +191,33 @@ func deleteTask(w http.ResponseWriter, r *http.Request) {
 	}
 	id, err := strconv.Atoi(idHeader)
 	if err != nil {
-		log.Println("Invalid ID")
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		log.Println("Invalid ID header")
+		http.Error(w, "Invalid ID header", http.StatusBadRequest)
 		return
 	}
-	var existingName string
-	db, err := sql.Open("sqlite3", "./tasks.db")
-	if err != nil {
-		log.Printf("Internal server error: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-	defer db.Close()
-	err = db.QueryRow("SELECT name FROM tasks WHERE id=?", id).Scan(&existingName)
-	if err != nil {
-		log.Printf("Error retrieving task to user name: %v", err)
-		http.Error(w, "Error retrieving task to user name", http.StatusInternalServerError)
-		return
-	}
-	name := r.Header.Get("name")
-	if name != existingName {
-		log.Println("Provided name does not match existing user name")
-		http.Error(w, "Provided name does not match existing user name", http.StatusBadRequest)
-		return
-	}
-	_, err = db.Exec("UPDATE tasks SET name='', due_date=NULL, completed=false WHERE id=?", id)
+	result, err := app.db.Exec("DELETE FROM tasks WHERE id=?", id)
 	if err != nil {
 		log.Printf("Error deleting task: %v", err)
 		http.Error(w, "Error deleting task", http.StatusInternalServerError)
 		return
 	}
-	for i, task := range tasks {
-		if task.ID == id {
-			tasks[i].Name = ""
-			tasks[i].DueDate = ""
-			tasks[i].Completed = false
-			break
-		}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		log.Printf("Error getting rows affected: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if rowsAffected == 0 {
+		log.Println("Task not found")
+		http.Error(w, "Task not found", http.StatusNotFound)
+		return
 	}
 	w.WriteHeader(http.StatusOK)
-	log.Println("Task cleared successfully")
-	_, _ = w.Write([]byte("Task cleared successfully"))
+	log.Println("Task deleted successfully")
+	_, _ = w.Write([]byte("Task deleted successfully"))
 }
 
-func getTaskByID(w http.ResponseWriter, r *http.Request) {
+func (app *App) getTaskByID(w http.ResponseWriter, r *http.Request) {
 	idHeader := r.Header.Get("ID")
 	if idHeader == "" {
 		log.Println("Missing ID header")
@@ -238,36 +226,22 @@ func getTaskByID(w http.ResponseWriter, r *http.Request) {
 	}
 	id, err := strconv.Atoi(idHeader)
 	if err != nil {
-		log.Println("Invalid ID")
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		log.Println("Invalid ID header")
+		http.Error(w, "Invalid ID header", http.StatusBadRequest)
 		return
 	}
-	db, err := sql.Open("sqlite3", "./tasks.db")
-	if err != nil {
-		log.Println("Internal server error")
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-	defer db.Close()
-	var (
-		name      string
-		dueDate   string
-		completed bool
-	)
-	err = db.QueryRow("SELECT name, due_date, completed FROM tasks WHERE id=?", id).Scan(&name, &dueDate, &completed)
+	var task Task
+	err = app.db.QueryRow("SELECT id, name, due_date, completed FROM tasks WHERE id=?", id).Scan(&task.ID, &task.Name, &task.DueDate, &task.Completed)
 	if err != nil {
 		log.Println("Task not found")
 		http.Error(w, "Task not found", http.StatusNotFound)
 		return
 	}
-	task := Task{
-		ID:        id,
-		Name:      name,
-		DueDate:   dueDate,
-		Completed: completed,
-	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(task)
-	log.Println("Task gathered successfully")
-	_, _ = w.Write([]byte("Task gathered successfully"))
+	if err = json.NewEncoder(w).Encode(task); err != nil {
+		log.Printf("Error encoding task to JSON: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	log.Println("Task retrieved successfully")
 }

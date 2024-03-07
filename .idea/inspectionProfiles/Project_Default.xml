@@ -27,6 +27,7 @@
         <method importPath="encoding/json" receiver="*Encoder" name="Encode" />
         <method importPath="encoding/json" receiver="*Decoder" name="Decode" />
         <method importPath="database/sql" receiver="*DB" name="Close" />
+        <method importPath="database/sql" receiver="*Rows" name="Close" />
       </methods>
     </inspection_tool>
     <inspection_tool class="LanguageDetectionInspection" enabled="false" level="WARNING" enabled_by_default="false" />
