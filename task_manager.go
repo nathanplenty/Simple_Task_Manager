@@ -147,6 +147,19 @@ func updateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer db.Close()
+	var existingName string
+	err = db.QueryRow("SELECT name FROM tasks WHERE id=?", id).Scan(&existingName)
+	if err != nil {
+		log.Printf("Error retrieving task to user name: %v", err)
+		http.Error(w, "Error retrieving task to user name", http.StatusInternalServerError)
+		return
+	}
+	name := r.Header.Get("name")
+	if name != existingName {
+		log.Println("Provided name does not match existing user name")
+		http.Error(w, "Provided name does not match existing user name", http.StatusBadRequest)
+		return
+	}
 	_, err = db.Exec("UPDATE tasks SET completed=? WHERE id=?", completed, id)
 	if err != nil {
 		log.Printf("Error updating task: %v", err)
@@ -177,6 +190,7 @@ func deleteTask(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid ID", http.StatusBadRequest)
 		return
 	}
+	var existingName string
 	db, err := sql.Open("sqlite3", "./tasks.db")
 	if err != nil {
 		log.Printf("Internal server error: %v", err)
@@ -184,6 +198,18 @@ func deleteTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer db.Close()
+	err = db.QueryRow("SELECT name FROM tasks WHERE id=?", id).Scan(&existingName)
+	if err != nil {
+		log.Printf("Error retrieving task to user name: %v", err)
+		http.Error(w, "Error retrieving task to user name", http.StatusInternalServerError)
+		return
+	}
+	name := r.Header.Get("name")
+	if name != existingName {
+		log.Println("Provided name does not match existing user name")
+		http.Error(w, "Provided name does not match existing user name", http.StatusBadRequest)
+		return
+	}
 	_, err = db.Exec("UPDATE tasks SET name='', due_date=NULL, completed=false WHERE id=?", id)
 	if err != nil {
 		log.Printf("Error deleting task: %v", err)
