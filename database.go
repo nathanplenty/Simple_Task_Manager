@@ -6,7 +6,7 @@ import (
 	"log"
 )
 
-func main() {
+func createTables() {
 	db, err := sql.Open("sqlite3", "./tasks.db")
 	if err != nil {
 		log.Fatalf("Error opening database connection: %v", err)
@@ -48,4 +48,8 @@ func main() {
 	}
 
 	log.Println("Database schema created successfully")
+}
+
+func main() {
+	createTables()
 }

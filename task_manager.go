@@ -28,18 +28,29 @@ func (app *App) initDatabase() {
 	if err != nil {
 		log.Fatalf("Error opening database connection: %v", err)
 	}
-	_, err = app.db.Exec(`
-		CREATE TABLE IF NOT EXISTS tasks (
-			id INTEGER PRIMARY KEY,
-			name TEXT NOT NULL,
-			due_date DATE,
-			completed BOOLEAN
-		);
-	`)
+	rows, err := app.db.Query("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('tasks', 'users', 'task_assignments')")
 	if err != nil {
-		log.Fatalf("Error creating table: %v", err)
+		log.Fatalf("Error querying database tables: %v", err)
 	}
-	log.Println("Database initiated successfully")
+	defer rows.Close()
+	var tableName string
+	for rows.Next() {
+		err := rows.Scan(&tableName)
+		if err != nil {
+			log.Fatalf("Error scanning table name: %v", err)
+		}
+		switch tableName {
+		case "tasks":
+			log.Println("Tasks table exists")
+		case "users":
+			log.Println("Users table exists")
+		case "task_assignments":
+			log.Println("Task assignments table exists")
+		default:
+			log.Printf("Unknown table found: %s", tableName)
+		}
+	}
+	log.Println("Database initialized successfully")
 }
 
 func main() {
@@ -121,8 +132,6 @@ func (app *App) createTask(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Missing due date header", http.StatusBadRequest)
 		return
 	}
-
-	// Insert task into tasks table
 	result, err := app.db.Exec("INSERT INTO tasks(name, due_date, completed) VALUES(?, ?, ?)", taskName, dueDate, false)
 	if err != nil {
 		log.Printf("Error inserting task: %v", err)
@@ -135,8 +144,6 @@ func (app *App) createTask(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-
-	// Get or insert user ID
 	var userID int
 	err = app.db.QueryRow("SELECT user_id FROM users WHERE username = ?", userName).Scan(&userID)
 	switch {
@@ -159,15 +166,12 @@ func (app *App) createTask(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-
-	// Assign task to user
 	_, err = app.db.Exec("INSERT INTO task_assignments(task_id, user_id) VALUES(?, ?)", taskID, userID)
 	if err != nil {
 		log.Printf("Error assigning task to user: %v", err)
 		http.Error(w, "Error assigning task to user", http.StatusInternalServerError)
 		return
 	}
-
 	w.WriteHeader(http.StatusCreated)
 	log.Println("Task created successfully")
 }
