@@ -1,4 +1,4 @@
-package main
+package taskdatabase
 
 import (
 	"database/sql"
@@ -6,10 +6,11 @@ import (
 	"log"
 )
 
-func createTables() {
+func CreateTables() bool {
 	db, err := sql.Open("sqlite3", "./database/tasks.db")
 	if err != nil {
 		log.Fatalf("Error opening database connection: %v", err)
+		return false
 	}
 	defer db.Close()
 	_, err = db.Exec(`
@@ -20,6 +21,7 @@ func createTables() {
 	`)
 	if err != nil {
 		log.Fatalf("Error creating 'users' table: %v", err)
+		return false
 	}
 	_, err = db.Exec(`
 		CREATE TABLE IF NOT EXISTS tasks (
@@ -33,10 +35,8 @@ func createTables() {
 	`)
 	if err != nil {
 		log.Fatalf("Error creating 'tasks' table: %v", err)
+		return false
 	}
 	log.Println("Database schema created successfully")
-}
-
-func main() {
-	createTables()
+	return true
 }

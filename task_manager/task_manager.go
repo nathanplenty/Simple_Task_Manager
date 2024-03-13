@@ -1,4 +1,4 @@
-package main
+package taskmanager
 
 import (
 	"database/sql"
@@ -26,15 +26,17 @@ type User struct {
 	UserName string `json:"user_name"`
 }
 
-func (app *App) initDatabase() {
+func (app *App) InitDatabase() bool {
 	var err error
 	app.db, err = sql.Open("sqlite3", "./database/tasks.db")
 	if err != nil {
 		log.Fatalf("Error opening database connection: %v", err)
+		return false
 	}
 	rows, err := app.db.Query("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('tasks', 'users')")
 	if err != nil {
 		log.Fatalf("Error querying database tables: %v", err)
+		return false
 	}
 	defer rows.Close()
 	var tableName string
@@ -42,6 +44,7 @@ func (app *App) initDatabase() {
 		err = rows.Scan(&tableName)
 		if err != nil {
 			log.Fatalf("Error scanning table name: %v", err)
+			return false
 		}
 		switch tableName {
 		case "tasks":
@@ -50,19 +53,14 @@ func (app *App) initDatabase() {
 			log.Println("Users table exists")
 		default:
 			log.Printf("Unknown table found: %s", tableName)
+			return false
 		}
 	}
 	log.Println("Database initialized successfully")
+	return true
 }
 
-func main() {
-	app := &App{}
-	app.initDatabase()
-	http.HandleFunc("/tasks", app.handleTasks)
-	log.Fatal(http.ListenAndServe(":8080", nil))
-}
-
-func (app *App) handleTasks(w http.ResponseWriter, r *http.Request) {
+func (app *App) HandleTasks(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		if r.Header.Get("task_id") != "" {
@@ -332,8 +330,4 @@ func (app *App) getTaskByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	log.Println("Task retrieved successfully")
-}
-
-func simple() bool {
-	return true
 }
