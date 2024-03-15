@@ -1,22 +1,19 @@
 package taskdatabase
 
-// Adjust import for MongoDB
 import (
 	"database/sql"
 	_ "github.com/mattn/go-sqlite3"
 	"log"
 )
 
-func CreateTables() bool {
-	// Adjust connection for MongoDB, instead of a lite database we want a client
+func CreateTables() error {
 	db, err := sql.Open("sqlite3", "./database/tasks.db")
 	if err != nil {
 		log.Fatalf("Error opening database connection: %v", err)
-		return false
+		return err
 	}
 	defer db.Close()
-	// Adjust table for MongoDB, instead of create table we want a new collection
-	// Adjust columns for MongoDB, instead of creating columns we want models
+
 	_, err = db.Exec(`
 		CREATE TABLE IF NOT EXISTS users (
 			user_id INTEGER PRIMARY KEY,
@@ -25,10 +22,9 @@ func CreateTables() bool {
 	`)
 	if err != nil {
 		log.Fatalf("Error creating 'users' table: %v", err)
-		return false
+		return err
 	}
-	// Adjust table for MongoDB, instead of create table we want a new collection
-	// Adjust columns for MongoDB, instead of creating columns we want models
+
 	_, err = db.Exec(`
 		CREATE TABLE IF NOT EXISTS tasks (
 			task_id INTEGER PRIMARY KEY,
@@ -41,8 +37,9 @@ func CreateTables() bool {
 	`)
 	if err != nil {
 		log.Fatalf("Error creating 'tasks' table: %v", err)
-		return false
+		return err
 	}
-	log.Println("Database schema created successfully")
-	return true
+
+	log.Println("Database created successfully")
+	return nil
 }
