@@ -6,6 +6,11 @@ import (
 	"log"
 )
 
+//import (
+//	"log"
+//	mgo "gopkg.in/mgo.v2"
+//)
+
 func CreateTables() error {
 	db, err := sql.Open("sqlite3", "./database/tasks.db")
 	if err != nil {
@@ -43,3 +48,21 @@ func CreateTables() error {
 	log.Println("Database created successfully")
 	return nil
 }
+
+//func CreateTables() error {
+//	session, err := mgo.Dial("localhost")
+//// check connection
+//	db := session.DB("tasks")
+//
+//	err = db.C("users").EnsureIndex(mgo.Index{
+//		Key:    []string{"user_id"},
+//		Unique: true,
+//	})
+//// check users container
+//	err = db.C("tasks").EnsureIndex(mgo.Index{
+//		Key:    []string{"task_id"},
+//		Unique: true,
+//	})
+//// check tasks container
+//// finish end of function
+//}

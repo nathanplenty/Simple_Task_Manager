@@ -9,9 +9,21 @@ import (
 	"net/http"
 )
 
+//import (
+//	"encoding/json"
+//	"log"
+//	"net/http"
+//	"gopkg.in/mgo.v2/bson"
+//	"gopkg.in/mgo.v2"
+//)
+
 type App struct {
 	db *sql.DB
 }
+
+//type App struct {
+//	session *mgo.Session
+//}
 
 type Task struct {
 	TaskID    int    `json:"task_id"`
@@ -20,10 +32,22 @@ type Task struct {
 	Completed bool   `json:"completed"`
 }
 
+//type Task struct {
+//	TaskID    bson.ObjectId `json:"task_id" bson:"_id"`
+//	TaskName  string        `json:"task_name" bson:"task_name"`
+//	DueDate   string        `json:"due_date" bson:"due_date"`
+//	Completed bool          `json:"completed" bson:"completed"`
+//}
+
 type User struct {
 	UserID   int    `json:"user_id"`
 	UserName string `json:"user_name"`
 }
+
+//type User struct {
+//	UserID   bson.ObjectId `json:"user_id" bson:"_id"`
+//	UserName string        `json:"user_name" bson:"user_name"`
+//}
 
 func (app *App) CheckDatabase() error {
 	var err error
@@ -42,6 +66,13 @@ func (app *App) CheckDatabase() error {
 	log.Println("Database initialized successfully")
 	return nil
 }
+
+//func (app *App) CheckDatabase() error {
+//	session, err := mgo.Dial("localhost")
+//// check connection
+//	app.session = session
+//// finish end of function
+//}
 
 func (app *App) HandleTasks(w http.ResponseWriter, r *http.Request) {
 	var requestBody map[string]interface{}
