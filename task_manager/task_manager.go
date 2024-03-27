@@ -18,7 +18,7 @@ import (
 //)
 
 type App struct {
-	db *sql.DB
+	DB *sql.DB
 }
 
 //type App struct {
@@ -51,12 +51,12 @@ type User struct {
 
 func (app *App) CheckDatabase() error {
 	var err error
-	app.db, err = sql.Open("sqlite3", "./database/tasks.db")
+	app.DB, err = sql.Open("sqlite3", "./database/tasks.db")
 	if err != nil {
 		log.Fatalf("Error opening database connection: %v", err)
 		return err
 	}
-	rows, err := app.db.Query("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('tasks', 'users')")
+	rows, err := app.DB.Query("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('tasks', 'users')")
 	if err != nil {
 		log.Fatalf("Error querying database tables: %v", err)
 		return err
@@ -74,47 +74,9 @@ func (app *App) CheckDatabase() error {
 //// finish end of function
 //}
 
-func (app *App) HandleTasks(w http.ResponseWriter, r *http.Request) {
-	var requestBody map[string]interface{}
-	err := json.NewDecoder(r.Body).Decode(&requestBody)
-	log.Printf("Decoded request body: %+v\n", requestBody)
-
-	if err != nil {
-		log.Println("Error decoding request body:", err)
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	switch r.Method {
-	case http.MethodGet:
-		if len(requestBody) == 1 && requestBody["task_id"] != nil {
-			taskID := int(requestBody["task_id"].(float64))
-			app.getTaskByID(w, taskID)
-		} else {
-			app.getTasks(w)
-		}
-	case http.MethodPost:
-		userName := requestBody["user_name"].(string)
-		taskName := requestBody["task_name"].(string)
-		dueDate := requestBody["due_date"].(string)
-		app.createTask(w, userName, taskName, dueDate)
-	case http.MethodPatch:
-		taskID := int(requestBody["task_id"].(float64))
-		userID := int(requestBody["user_id"].(float64))
-		app.updateTask(w, taskID, userID)
-	case http.MethodDelete:
-		taskID := int(requestBody["task_id"].(float64))
-		userID := int(requestBody["user_id"].(float64))
-		app.deleteTask(w, taskID, userID)
-	default:
-		log.Printf("Method %s not allowed", r.Method)
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-	}
-}
-
-func (app *App) getTasks(w http.ResponseWriter) {
+func (app *App) GetTasks(w http.ResponseWriter) {
 	var tasks []Task
-	rows, err := app.db.Query("SELECT t.task_id, t.task_name, t.due_date, t.completed, u.user_id, u.user_name FROM tasks t INNER JOIN users u ON t.user_id = u.user_id")
+	rows, err := app.DB.Query("SELECT t.task_id, t.task_name, t.due_date, t.completed, u.user_id, u.user_name FROM tasks t INNER JOIN users u ON t.user_id = u.user_id")
 	if err != nil {
 		log.Printf("Error querying tasks from database: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -158,7 +120,7 @@ func (app *App) getTasks(w http.ResponseWriter) {
 	log.Println("Tasks gathered successfully")
 }
 
-func (app *App) createTask(w http.ResponseWriter, userName, taskName, dueDate string) {
+func (app *App) CreateTask(w http.ResponseWriter, userName, taskName, dueDate string) {
 	var requestBody = struct {
 		UserName string `json:"user_name"`
 		TaskName string `json:"task_name"`
@@ -186,10 +148,10 @@ func (app *App) createTask(w http.ResponseWriter, userName, taskName, dueDate st
 	}
 
 	var userID int
-	err := app.db.QueryRow("SELECT user_id FROM users WHERE user_name = ?", requestBody.UserName).Scan(&userID)
+	err := app.DB.QueryRow("SELECT user_id FROM users WHERE user_name = ?", requestBody.UserName).Scan(&userID)
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
-		result, err := app.db.Exec("INSERT INTO users(user_name) VALUES(?)", requestBody.UserName)
+		result, err := app.DB.Exec("INSERT INTO users(user_name) VALUES(?)", requestBody.UserName)
 		if err != nil {
 			log.Printf("Error creating new user: %v", err)
 			http.Error(w, "Error creating new user", http.StatusInternalServerError)
@@ -208,7 +170,7 @@ func (app *App) createTask(w http.ResponseWriter, userName, taskName, dueDate st
 		return
 	}
 
-	result, err := app.db.Exec("INSERT INTO tasks(task_name, due_date, completed, user_id) VALUES(?, ?, ?, ?)", requestBody.TaskName, requestBody.DueDate, false, userID)
+	result, err := app.DB.Exec("INSERT INTO tasks(task_name, due_date, completed, user_id) VALUES(?, ?, ?, ?)", requestBody.TaskName, requestBody.DueDate, false, userID)
 	if err != nil {
 		log.Printf("Error inserting task: %v", err)
 		http.Error(w, "Error inserting task", http.StatusInternalServerError)
@@ -227,9 +189,9 @@ func (app *App) createTask(w http.ResponseWriter, userName, taskName, dueDate st
 	_, _ = w.Write([]byte("Task created successfully"))
 }
 
-func (app *App) updateTask(w http.ResponseWriter, taskID, userID int) {
+func (app *App) UpdateTask(w http.ResponseWriter, taskID, userID int) {
 	var exists bool
-	err := app.db.QueryRow("SELECT EXISTS(SELECT 1 FROM tasks WHERE task_id=? AND user_id=?)", taskID, userID).Scan(&exists)
+	err := app.DB.QueryRow("SELECT EXISTS(SELECT 1 FROM tasks WHERE task_id=? AND user_id=?)", taskID, userID).Scan(&exists)
 	if err != nil {
 		log.Printf("Error checking task assignment: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -241,7 +203,7 @@ func (app *App) updateTask(w http.ResponseWriter, taskID, userID int) {
 		return
 	}
 
-	_, err = app.db.Exec("UPDATE tasks SET completed=true WHERE task_id=?", taskID)
+	_, err = app.DB.Exec("UPDATE tasks SET completed=true WHERE task_id=?", taskID)
 	if err != nil {
 		log.Printf("Error updating task: %v", err)
 		http.Error(w, "Error updating task", http.StatusInternalServerError)
@@ -253,9 +215,9 @@ func (app *App) updateTask(w http.ResponseWriter, taskID, userID int) {
 	_, _ = w.Write([]byte("Task updated successfully"))
 }
 
-func (app *App) deleteTask(w http.ResponseWriter, taskID, userID int) {
+func (app *App) DeleteTask(w http.ResponseWriter, taskID, userID int) {
 	var exists bool
-	err := app.db.QueryRow("SELECT EXISTS(SELECT 1 FROM tasks WHERE task_id=? AND user_id=?)", taskID, userID).Scan(&exists)
+	err := app.DB.QueryRow("SELECT EXISTS(SELECT 1 FROM tasks WHERE task_id=? AND user_id=?)", taskID, userID).Scan(&exists)
 	if err != nil {
 		log.Printf("Error checking task assignment: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -267,7 +229,7 @@ func (app *App) deleteTask(w http.ResponseWriter, taskID, userID int) {
 		return
 	}
 
-	_, err = app.db.Exec("UPDATE tasks SET task_name='X', due_date='0001-01-01', completed=false WHERE task_id=?", taskID)
+	_, err = app.DB.Exec("UPDATE tasks SET task_name='X', due_date='0001-01-01', completed=false WHERE task_id=?", taskID)
 	if err != nil {
 		log.Printf("Error anonymizing task: %v", err)
 		http.Error(w, "Error anonymizing task", http.StatusInternalServerError)
@@ -278,9 +240,9 @@ func (app *App) deleteTask(w http.ResponseWriter, taskID, userID int) {
 	_, _ = w.Write([]byte("Task anonymized successfully"))
 }
 
-func (app *App) getTaskByID(w http.ResponseWriter, TaskID int) {
+func (app *App) GetTaskByID(w http.ResponseWriter, TaskID int) {
 	var task Task
-	err := app.db.QueryRow("SELECT task_id, task_name, due_date, completed FROM tasks WHERE task_id=?", TaskID).Scan(&task.TaskID, &task.TaskName, &task.DueDate, &task.Completed)
+	err := app.DB.QueryRow("SELECT task_id, task_name, due_date, completed FROM tasks WHERE task_id=?", TaskID).Scan(&task.TaskID, &task.TaskName, &task.DueDate, &task.Completed)
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
 		log.Println("Task not found")
