@@ -1,0 +1,98 @@
+Implement ideas
+
+Notes:
+// flexibel den Code anpassen > Ziel für weitere Entwicklung
+// repetitive Arbeit soll vermieden werden
+// Abhängigkeiten reduzieren innerhalb vom Code
+// gibt es eine bessere Lösung, als switch um nach Datenbank zu agieren? > Interface soll mir die Antwort zu dieser Frage geben
+// json = bson = xml > struct kann besser "marched" werden
+// !!! WORK1: Interface einbauen, keine verschiedenen steckdosen bauen (SQLite Toaster, MongoDB Kühlschrank) (Objekte wie in Python) !!!
+// UI ungleich Interface! Interface kann UI sein, aber als verständnis als objekt speichern
+// WORK2: Auf MongoDB umstellen > wechsel soll fliegend passieren
+// (WORK3: Pattern lernen, versuch Dinge miteinander kompatible zu machen)
+// (WORK4: UnitTest "mocking", Werte selbst festlegen)
+// Prinzipien nutzen, um guten Code zu bauen > für skalierbare / flexible Projekte Interface nutzen
+// Fehler "fangen" verstehen:
+// Fehler sollten so weit außen wie möglich aber so weit innen wie nötig behandelt werden.
+// Der Use-Case entscheidet über die Fehlerbehandlung - nicht die Kernlogik.
+// .log error values kennenlernen
+
+Code-Structure:
+Simple_Task_Manager
+-database
+--task_database.go
+---CreateTables()
+-router
+--task_handler.go
+---HandleTasks()
+-task_manager
+--task_manager.go
+---CheckDatabase()
+---GetTasks()
+---CreateTask()
+---UpdateTask()
+---DeleteTask()
+---GetTaskByID()
+-go.mod
+-main.go
+--main()
+
+MongoDB:
+task_manager.go:
+
+//import (
+//	"encoding/json"
+//	"log"
+//	"net/http"
+//	"gopkg.in/mgo.v2/bson"
+//	"gopkg.in/mgo.v2"
+//)
+
+//type App struct {
+//	session *mgo.Session
+//}
+
+//type Task struct {
+//	TaskID    bson.ObjectId `json:"task_id" bson:"_id"`
+//	TaskName  string        `json:"task_name" bson:"task_name"`
+//	DueDate   string        `json:"due_date" bson:"due_date"`
+//	Completed bool          `json:"completed" bson:"completed"`
+//}
+
+
+//type User struct {
+//	UserID   bson.ObjectId `json:"user_id" bson:"_id"`
+//	UserName string        `json:"user_name" bson:"user_name"`
+//}
+
+//func (app *App) CheckDatabase() error {
+//	session, err := mgo.Dial("localhost")
+//// check connection
+//	app.session = session
+//// finish end of function
+//}
+
+database.go:
+
+//import (
+//	"log"
+//	mgo "gopkg.in/mgo.v2"
+//)
+
+//func CreateTables() error {
+//	session, err := mgo.Dial("localhost")
+//// check connection
+//	db := session.DB("tasks")
+//
+//	err = db.C("users").EnsureIndex(mgo.Index{
+//		Key:    []string{"user_id"},
+//		Unique: true,
+//	})
+//// check users container
+//	err = db.C("tasks").EnsureIndex(mgo.Index{
+//		Key:    []string{"task_id"},
+//		Unique: true,
+//	})
+//// check tasks container
+//// finish end of function
+//}
