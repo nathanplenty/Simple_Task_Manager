@@ -4,9 +4,9 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	_ "github.com/mattn/go-sqlite3"
 	"log"
 	"net/http"
+	"strconv"
 )
 
 type App struct {
@@ -43,7 +43,18 @@ func (app *App) CheckDatabase() error {
 	return nil
 }
 
-func (app *App) GetTasks(w http.ResponseWriter) {
+func (app *App) GetTasks(w http.ResponseWriter, r *http.Request) {
+	taskIDStr := r.URL.Query().Get("task_id")
+	if taskIDStr != "" {
+		taskID, err := strconv.Atoi(taskIDStr)
+		if err != nil {
+			log.Println("Invalid task ID:", err)
+			http.Error(w, "Invalid task ID", http.StatusBadRequest)
+			return
+		}
+		app.GetTaskByID(w, taskID)
+		return
+	}
 	var tasks []Task
 	rows, err := app.DB.Query("SELECT t.task_id, t.task_name, t.due_date, t.completed, u.user_id, u.user_name FROM tasks t INNER JOIN users u ON t.user_id = u.user_id")
 	if err != nil {
