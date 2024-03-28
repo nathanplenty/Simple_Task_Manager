@@ -23,10 +23,6 @@ type App struct {
 	TaskManager TaskManager
 }
 
-func NewApp(manager TaskManager) *App {
-	return &App{TaskManager: manager}
-}
-
 func (app *App) HandleTasks(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 
