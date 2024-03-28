@@ -6,15 +6,37 @@ import (
 	"log"
 )
 
-func NewSQLiteDB() error {
-	db, err := sql.Open("sqlite3", "./database/tasks.db")
+type DBManager interface {
+	OpenDatabase() (*sql.DB, error)
+	InitializeDatabase() error
+}
+
+type SQLiteDB struct {
+	DatabasePath string
+}
+
+func NewSQLiteDB(databasePath string) *SQLiteDB {
+	return &SQLiteDB{DatabasePath: databasePath}
+}
+
+func (db *SQLiteDB) OpenDatabase() (*sql.DB, error) {
+	database, err := sql.Open("sqlite3", db.DatabasePath)
+	if err != nil {
+		log.Fatalf("Error opening database connection: %v", err)
+		return nil, err
+	}
+	return database, nil
+}
+
+func (db *SQLiteDB) InitializeDatabase() error {
+	database, err := db.OpenDatabase()
 	if err != nil {
 		log.Fatalf("Error opening database connection: %v", err)
 		return err
 	}
-	defer db.Close()
+	defer database.Close()
 
-	_, err = db.Exec(`
+	_, err = database.Exec(`
         CREATE TABLE IF NOT EXISTS users (
             user_id INTEGER PRIMARY KEY,
             user_name TEXT NOT NULL
@@ -25,7 +47,7 @@ func NewSQLiteDB() error {
 		return err
 	}
 
-	_, err = db.Exec(`
+	_, err = database.Exec(`
         CREATE TABLE IF NOT EXISTS tasks (
             task_id INTEGER PRIMARY KEY,
             user_id INTEGER,

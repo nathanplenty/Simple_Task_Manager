@@ -9,6 +9,14 @@ import (
 	"strconv"
 )
 
+type TaskManager interface {
+	GetTaskByID(w http.ResponseWriter, taskID int)
+	UpdateTask(w http.ResponseWriter, taskID, userID int)
+	DeleteTask(w http.ResponseWriter, taskID, userID int)
+	GetTasks(w http.ResponseWriter, r *http.Request)
+	CreateTask(w http.ResponseWriter, userName, taskName, dueDate string)
+}
+
 type App struct {
 	DB *sql.DB
 }
@@ -25,22 +33,79 @@ type User struct {
 	UserName string `json:"user_name"`
 }
 
-func (app *App) CheckDatabase() error {
-	var err error
-	app.DB, err = sql.Open("sqlite3", "./database/tasks.db")
-	if err != nil {
-		log.Fatalf("Error opening database connection: %v", err)
-		return err
+func (app *App) GetTaskByID(w http.ResponseWriter, taskID int) {
+	var task Task
+	err := app.DB.QueryRow("SELECT task_id, task_name, due_date, completed FROM tasks WHERE task_id=?", taskID).Scan(&task.TaskID, &task.TaskName, &task.DueDate, &task.Completed)
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		log.Println("Task not found")
+		http.Error(w, "Task not found", http.StatusNotFound)
+		return
+	case err != nil:
+		log.Printf("Error retrieving task: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
 	}
-	rows, err := app.DB.Query("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('tasks', 'users')")
-	if err != nil {
-		log.Fatalf("Error querying database tables: %v", err)
-		return err
-	}
-	defer rows.Close()
 
-	log.Println("Database initialized successfully")
-	return nil
+	w.Header().Set("Content-Type", "application/json")
+	err = json.NewEncoder(w).Encode(task)
+	if err != nil {
+		log.Printf("Error encoding task to JSON: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	log.Println("Task retrieved successfully")
+}
+
+func (app *App) UpdateTask(w http.ResponseWriter, taskID, userID int) {
+	var exists bool
+	err := app.DB.QueryRow("SELECT EXISTS(SELECT 1 FROM tasks WHERE task_id=? AND user_id=?)", taskID, userID).Scan(&exists)
+	if err != nil {
+		log.Printf("Error checking task assignment: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if !exists {
+		log.Println("Task assignment not found or user does not have permission")
+		http.Error(w, "Task assignment not found or user does not have permission", http.StatusNotFound)
+		return
+	}
+
+	_, err = app.DB.Exec("UPDATE tasks SET completed=true WHERE task_id=?", taskID)
+	if err != nil {
+		log.Printf("Error updating task: %v", err)
+		http.Error(w, "Error updating task", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	log.Println("Task updated successfully")
+	_, _ = w.Write([]byte("Task updated successfully"))
+}
+
+func (app *App) DeleteTask(w http.ResponseWriter, taskID, userID int) {
+	var exists bool
+	err := app.DB.QueryRow("SELECT EXISTS(SELECT 1 FROM tasks WHERE task_id=? AND user_id=?)", taskID, userID).Scan(&exists)
+	if err != nil {
+		log.Printf("Error checking task assignment: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if !exists {
+		log.Println("Task assignment not found or user does not have permission")
+		http.Error(w, "Task assignment not found or user does not have permission", http.StatusNotFound)
+		return
+	}
+
+	_, err = app.DB.Exec("UPDATE tasks SET task_name='X', due_date='0001-01-01', completed=false WHERE task_id=?", taskID)
+	if err != nil {
+		log.Printf("Error anonymizing task: %v", err)
+		http.Error(w, "Error anonymizing task", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	log.Println("Task content anonymized successfully")
+	_, _ = w.Write([]byte("Task anonymized successfully"))
 }
 
 func (app *App) GetTasks(w http.ResponseWriter, r *http.Request) {
@@ -167,79 +232,4 @@ func (app *App) CreateTask(w http.ResponseWriter, userName, taskName, dueDate st
 	w.WriteHeader(http.StatusCreated)
 	log.Println("Task created successfully")
 	_, _ = w.Write([]byte("Task created successfully"))
-}
-
-func (app *App) UpdateTask(w http.ResponseWriter, taskID, userID int) {
-	var exists bool
-	err := app.DB.QueryRow("SELECT EXISTS(SELECT 1 FROM tasks WHERE task_id=? AND user_id=?)", taskID, userID).Scan(&exists)
-	if err != nil {
-		log.Printf("Error checking task assignment: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-	if !exists {
-		log.Println("Task assignment not found or user does not have permission")
-		http.Error(w, "Task assignment not found or user does not have permission", http.StatusNotFound)
-		return
-	}
-
-	_, err = app.DB.Exec("UPDATE tasks SET completed=true WHERE task_id=?", taskID)
-	if err != nil {
-		log.Printf("Error updating task: %v", err)
-		http.Error(w, "Error updating task", http.StatusInternalServerError)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
-	log.Println("Task updated successfully")
-	_, _ = w.Write([]byte("Task updated successfully"))
-}
-
-func (app *App) DeleteTask(w http.ResponseWriter, taskID, userID int) {
-	var exists bool
-	err := app.DB.QueryRow("SELECT EXISTS(SELECT 1 FROM tasks WHERE task_id=? AND user_id=?)", taskID, userID).Scan(&exists)
-	if err != nil {
-		log.Printf("Error checking task assignment: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-	if !exists {
-		log.Println("Task assignment not found or user does not have permission")
-		http.Error(w, "Task assignment not found or user does not have permission", http.StatusNotFound)
-		return
-	}
-
-	_, err = app.DB.Exec("UPDATE tasks SET task_name='X', due_date='0001-01-01', completed=false WHERE task_id=?", taskID)
-	if err != nil {
-		log.Printf("Error anonymizing task: %v", err)
-		http.Error(w, "Error anonymizing task", http.StatusInternalServerError)
-		return
-	}
-	w.WriteHeader(http.StatusOK)
-	log.Println("Task content anonymized successfully")
-	_, _ = w.Write([]byte("Task anonymized successfully"))
-}
-
-func (app *App) GetTaskByID(w http.ResponseWriter, TaskID int) {
-	var task Task
-	err := app.DB.QueryRow("SELECT task_id, task_name, due_date, completed FROM tasks WHERE task_id=?", TaskID).Scan(&task.TaskID, &task.TaskName, &task.DueDate, &task.Completed)
-	switch {
-	case errors.Is(err, sql.ErrNoRows):
-		log.Println("Task not found")
-		http.Error(w, "Task not found", http.StatusNotFound)
-		return
-	case err != nil:
-		log.Printf("Error retrieving task: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	err = json.NewEncoder(w).Encode(task)
-	if err != nil {
-		log.Printf("Error encoding task to JSON: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-	log.Println("Task retrieved successfully")
 }

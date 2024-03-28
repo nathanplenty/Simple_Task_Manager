@@ -1,16 +1,30 @@
 package taskhandler
 
 import (
-	taskmanager "Simple_Task_Manager/task_manager"
 	"encoding/json"
-	_ "github.com/mattn/go-sqlite3"
 	"log"
 	"net/http"
 	"strconv"
 )
 
+type TaskHandler interface {
+	HandleTasks(w http.ResponseWriter, r *http.Request)
+}
+
+type TaskManager interface {
+	GetTaskByID(w http.ResponseWriter, taskID int)
+	UpdateTask(w http.ResponseWriter, taskID, userID int)
+	DeleteTask(w http.ResponseWriter, taskID, userID int)
+	GetTasks(w http.ResponseWriter, r *http.Request)
+	CreateTask(w http.ResponseWriter, userName, taskName, dueDate string)
+}
+
 type App struct {
-	TaskManager *taskmanager.App
+	TaskManager TaskManager
+}
+
+func NewApp(manager TaskManager) *App {
+	return &App{TaskManager: manager}
 }
 
 func (app *App) HandleTasks(w http.ResponseWriter, r *http.Request) {
