@@ -97,7 +97,7 @@ func (app *App) DeleteTask(w http.ResponseWriter, taskID, userID int) {
 		return
 	}
 
-	_, err = app.DB.Exec("UPDATE tasks SET task_name='X', due_date='0001-01-01', completed=false WHERE task_id=?", taskID)
+	_, err = app.DB.Exec("UPDATE tasks SET task_name='X', due_date='0001-01-01T00:00:00Z', completed=false WHERE task_id=?", taskID)
 	if err != nil {
 		log.Printf("Error anonymizing task: %v", err)
 		http.Error(w, "Error anonymizing task", http.StatusInternalServerError)
