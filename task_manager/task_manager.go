@@ -1,4 +1,4 @@
-package taskmanager
+package taskManager
 
 import (
 	"database/sql"

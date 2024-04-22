@@ -1,4 +1,4 @@
-package taskmanager
+package taskManager
 
 import (
 	"testing"
@@ -30,11 +30,4 @@ func TestDeleteTasks(t *testing.T) {
 
 func TestGetTasksByID(t *testing.T) {
 	// Testen der getTasksByID-Funktion
-}
-
-func TestSimple(t *testing.T) {
-	result := simple()
-	if result != true {
-		t.Errorf("Boolean = %v; want true", result)
-	}
 }

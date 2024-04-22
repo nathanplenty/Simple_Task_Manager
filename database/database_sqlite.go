@@ -1,4 +1,4 @@
-package taskdatabase
+package databaseSqlite
 
 import (
 	"database/sql"

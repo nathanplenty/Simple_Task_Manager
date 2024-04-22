@@ -1,15 +1,15 @@
 package main
 
 import (
-	taskdatabase "Simple_Task_Manager/database"
-	taskhandler "Simple_Task_Manager/router"
-	taskmanager "Simple_Task_Manager/task_manager"
+	databaseSqlite "Simple_Task_Manager/database"
+	routerHandler "Simple_Task_Manager/router"
+	taskManager "Simple_Task_Manager/task_manager"
 	"log"
 	"net/http"
 )
 
 func main() {
-	dbManager := taskdatabase.NewSQLiteDB("./database/tasks.db")
+	dbManager := databaseSqlite.NewSQLiteDB("./database/tasks.db")
 
 	database, err := dbManager.OpenDatabase()
 	if err != nil {
@@ -22,9 +22,9 @@ func main() {
 		log.Fatalf("Error initializing the database: %v", err)
 	}
 
-	app := &taskmanager.App{DB: database}
+	app := &taskManager.App{DB: database}
 
-	taskApp := &taskhandler.App{TaskManager: app}
+	taskApp := &routerHandler.App{TaskManager: app}
 
 	http.HandleFunc("/tasks", taskApp.HandleTasks)
 
