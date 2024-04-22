@@ -1,4 +1,4 @@
-package taskManager
+package taskManagerSqlite
 
 import (
 	"database/sql"
