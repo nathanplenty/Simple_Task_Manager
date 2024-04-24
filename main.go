@@ -1,68 +1,59 @@
 package main
 
 import (
-	databaseMongoDB "Simple_Task_Manager/database/mongodb"
-	databaseSqlite "Simple_Task_Manager/database/sqlite"
-	routerMongoDB "Simple_Task_Manager/router/mongodb"
-	routerSqlite "Simple_Task_Manager/router/sqlite"
-	taskManagerMongoDB "Simple_Task_Manager/task_manager/mongodb"
-	taskManagerSqlite "Simple_Task_Manager/task_manager/sqlite"
+	"Task_Manager/mongodb"
+	"Task_Manager/sql"
+	_ "github.com/mattn/go-sqlite3"
 	"log"
 	"net/http"
 )
 
 func main() {
-	const databaseType = 2
+	option := 1
 
-	switch databaseType {
+	switch option {
 	case 1:
-		sqlite()
+		setupSQL()
 	case 2:
-		mongodb()
+		setupMongoDB()
 	default:
-		log.Println("Invalid database type. Using SQLite as default.")
-		sqlite()
+		setupSQL()
 	}
 }
 
-func sqlite() {
-	var dbManager = databaseSqlite.NewSQLiteDB("./database/sqlite/sqlite.db")
-
-	database, err := dbManager.OpenDatabase()
+func setupSQL() {
+	db, err := sql.NewDatabase("sql/tasks.db")
 	if err != nil {
-		log.Fatalf("Error opening database connection: %v", err)
+		log.Fatal("Error opening database:", err)
 	}
 
-	defer database.Close()
-
-	if err = dbManager.InitializeDatabase(); err != nil {
-		log.Fatalf("Error initializing the database: %v", err)
+	err = db.Initialize()
+	if err != nil {
+		log.Fatal("Error initializing database:", err)
 	}
 
-	app := &taskManagerSqlite.App{DB: database}
+	controller := sql.NewController(db)
 
-	taskApp := &routerSqlite.App{TaskManager: app}
-
-	http.HandleFunc("/tasks", taskApp.HandleTasks)
+	http.HandleFunc("/tasks", func(w http.ResponseWriter, r *http.Request) {
+		controller.GetAllTasks(w)
+	})
+	http.HandleFunc("/tasks/add", controller.AddTask)
+	http.HandleFunc("/tasks/delete", controller.DeleteTask)
+	http.HandleFunc("/tasks/update", controller.UpdateTask)
 
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
-func mongodb() {
-	var dbManager = databaseMongoDB.NewMongoDB("mongodb://localhost:27017", "task_manager")
-	database, err := dbManager.OpenDatabase()
-	if err != nil {
-		log.Fatalf("Error opening database connection: %v", err)
-	}
+func setupMongoDB() {
+	collection := mongodb.NewCollection()
+	controller := mongodb.NewController(collection)
 
-	if err = dbManager.InitializeDatabase(); err != nil {
-		log.Fatalf("Error initializing the database: %v", err)
-	}
-
-	app := &taskManagerMongoDB.App{DB: database}
-	routerApp := &routerMongoDB.App{TaskManager: app}
-
-	http.HandleFunc("/tasks", routerApp.HandleTasks)
+	http.HandleFunc("/tasks", func(w http.ResponseWriter, r *http.Request) {
+		controller.GetAllTasks(w)
+	})
+	http.HandleFunc("/tasks/add", controller.AddTask)
+	http.HandleFunc("/tasks/delete", controller.DeleteTask)
+	http.HandleFunc("/tasks/update", controller.UpdateTask)
 
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
