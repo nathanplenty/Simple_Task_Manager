@@ -1,50 +1,64 @@
-package taskManagerMongodb
+package taskManagerMongoDB
 
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 	"log"
 	"net/http"
-	"strconv"
-	"time"
-
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type TaskManager interface {
-	GetTaskByID(w http.ResponseWriter, taskID string)
+	GetTaskByID(w http.ResponseWriter, taskID, userID string)
 	UpdateTask(w http.ResponseWriter, taskID, userID string)
 	DeleteTask(w http.ResponseWriter, taskID, userID string)
-	GetTasks(w http.ResponseWriter, r *http.Request)
+	GetTasks(w http.ResponseWriter)
 	CreateTask(w http.ResponseWriter, userName, taskName, dueDate string)
 }
 
 type App struct {
-	Client     *mongo.Client
-	Database   *mongo.Database
-	Collection *mongo.Collection
+	DB    *mongo.Database
+	Users *mongo.Collection
+	Tasks *mongo.Collection
 }
 
 type Task struct {
-	TaskID    int       `json:"task_id" bson:"task_id"`
-	TaskName  string    `json:"task_name" bson:"task_name"`
-	DueDate   time.Time `json:"due_date" bson:"due_date"`
-	Completed bool      `json:"completed" bson:"completed"`
+	TaskID    primitive.ObjectID `json:"task_id" bson:"_id"`
+	TaskName  string             `json:"task_name" bson:"task_name"`
+	DueDate   string             `json:"due_date" bson:"due_date"`
+	Completed bool               `json:"completed" bson:"completed"`
+	UserID    primitive.ObjectID `json:"user_id" bson:"user_id"`
 }
 
 type User struct {
-	UserID   int    `json:"user_id" bson:"user_id"`
-	UserName string `json:"user_name" bson:"user_name"`
+	UserID   primitive.ObjectID `json:"user_id" bson:"_id"`
+	UserName string             `json:"user_name" bson:"user_name"`
 }
 
-func (app *App) GetTaskByID(w http.ResponseWriter, taskID int) {
-	var task Task
-	filter := bson.M{"task_id": taskID}
-	err := app.Collection.FindOne(context.Background(), filter).Decode(&task)
+func (app *App) GetTaskByID(w http.ResponseWriter, taskID, userID string) {
+	objectID, err := primitive.ObjectIDFromHex(taskID)
 	if err != nil {
-		log.Println("Task not found")
-		http.Error(w, "Task not found", http.StatusNotFound)
+		log.Println("Invalid task ID:", err)
+		http.Error(w, "Invalid task ID", http.StatusBadRequest)
+		return
+	}
+
+	taskCollection := app.Tasks
+	filter := bson.M{"_id": objectID, "user_id": userID}
+
+	var task Task
+	err = taskCollection.FindOne(context.Background(), filter).Decode(&task)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			log.Println("Task not found")
+			http.Error(w, "Task not found", http.StatusNotFound)
+			return
+		}
+		log.Printf("Error retrieving task: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
@@ -58,19 +72,27 @@ func (app *App) GetTaskByID(w http.ResponseWriter, taskID int) {
 	log.Println("Task retrieved successfully")
 }
 
-func (app *App) UpdateTask(w http.ResponseWriter, taskID int) {
-	filter := bson.M{"task_id": taskID}
-	update := bson.M{"$set": bson.M{"completed": true}}
-	result, err := app.Collection.UpdateOne(context.Background(), filter, update)
+func (app *App) UpdateTask(w http.ResponseWriter, taskID, userID string) {
+	objectID, err := primitive.ObjectIDFromHex(taskID)
 	if err != nil {
-		log.Printf("Error updating task: %v", err)
-		http.Error(w, "Error updating task", http.StatusInternalServerError)
+		log.Println("Invalid task ID:", err)
+		http.Error(w, "Invalid task ID", http.StatusBadRequest)
 		return
 	}
 
-	if result.ModifiedCount == 0 {
-		log.Println("Task not found")
-		http.Error(w, "Task not found", http.StatusNotFound)
+	taskCollection := app.Tasks
+	filter := bson.M{"_id": objectID, "user_id": userID}
+
+	update := bson.M{
+		"$set": bson.M{
+			"completed": true,
+		},
+	}
+
+	_, err = taskCollection.UpdateOne(context.Background(), filter, update)
+	if err != nil {
+		log.Printf("Error updating task: %v", err)
+		http.Error(w, "Error updating task", http.StatusInternalServerError)
 		return
 	}
 
@@ -79,19 +101,29 @@ func (app *App) UpdateTask(w http.ResponseWriter, taskID int) {
 	_, _ = w.Write([]byte("Task updated successfully"))
 }
 
-func (app *App) DeleteTask(w http.ResponseWriter, taskID int) {
-	filter := bson.M{"task_id": taskID}
-	update := bson.M{"$set": bson.M{"task_name": "X", "due_date": time.Time{}, "completed": false}}
-	result, err := app.Collection.UpdateOne(context.Background(), filter, update)
+func (app *App) DeleteTask(w http.ResponseWriter, taskID, userID string) {
+	objectID, err := primitive.ObjectIDFromHex(taskID)
 	if err != nil {
-		log.Printf("Error anonymizing task: %v", err)
-		http.Error(w, "Error anonymizing task", http.StatusInternalServerError)
+		log.Println("Invalid task ID:", err)
+		http.Error(w, "Invalid task ID", http.StatusBadRequest)
 		return
 	}
 
-	if result.ModifiedCount == 0 {
-		log.Println("Task not found")
-		http.Error(w, "Task not found", http.StatusNotFound)
+	taskCollection := app.Tasks
+	filter := bson.M{"_id": objectID, "user_id": userID}
+
+	update := bson.M{
+		"$set": bson.M{
+			"task_name": "X",
+			"due_date":  "0001-01-01T00:00:00Z",
+			"completed": false,
+		},
+	}
+
+	_, err = taskCollection.UpdateOne(context.Background(), filter, update)
+	if err != nil {
+		log.Printf("Error anonymizing task: %v", err)
+		http.Error(w, "Error anonymizing task", http.StatusInternalServerError)
 		return
 	}
 
@@ -100,46 +132,30 @@ func (app *App) DeleteTask(w http.ResponseWriter, taskID int) {
 	_, _ = w.Write([]byte("Task anonymized successfully"))
 }
 
-func (app *App) GetTasks(w http.ResponseWriter, r *http.Request) {
-	taskIDStr := r.URL.Query().Get("task_id")
-	if taskIDStr != "" {
-		taskID, err := strconv.Atoi(taskIDStr)
-		if err != nil {
-			log.Println("Invalid task_id parameter:", err)
-			http.Error(w, "Invalid task_id parameter", http.StatusBadRequest)
-			return
-		}
-		app.GetTaskByID(w, taskID)
-		return
-	}
-
-	filter := bson.M{}
-	cursor, err := app.Collection.Find(context.Background(), filter)
+func (app *App) GetTasks(w http.ResponseWriter) {
+	taskCollection := app.Tasks
+	cursor, err := taskCollection.Find(context.Background(), bson.M{})
 	if err != nil {
 		log.Printf("Error querying tasks from database: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-	defer func() {
-		if cerr := cursor.Close(context.Background()); cerr != nil {
-			log.Printf("Error closing cursor: %v", cerr)
-		}
-	}()
 
 	var tasks []Task
 	for cursor.Next(context.Background()) {
 		var task Task
-		err = cursor.Decode(&task)
+		err := cursor.Decode(&task)
 		if err != nil {
-			log.Printf("Error decoding task document: %v", err)
+			log.Printf("Error decoding task: %v", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 		tasks = append(tasks, task)
 	}
 
-	if err = cursor.Err(); err != nil {
-		log.Printf("Error iterating over task documents: %v", err)
+	err = cursor.Err()
+	if err != nil {
+		log.Printf("Error iterating over task cursor: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -151,7 +167,6 @@ func (app *App) GetTasks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
 	_, err = w.Write(responseBody)
 	if err != nil {
 		log.Printf("Error writing response body: %v", err)
@@ -163,19 +178,27 @@ func (app *App) GetTasks(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *App) CreateTask(w http.ResponseWriter, userName, taskName, dueDate string) {
-	dueDateTime, err := time.Parse(time.RFC3339, dueDate)
+	user := User{
+		UserID:   primitive.NewObjectID(),
+		UserName: userName,
+	}
+
+	_, err := app.Users.InsertOne(context.Background(), user)
 	if err != nil {
-		log.Printf("Error parsing due date: %v", err)
-		http.Error(w, "Invalid due date format", http.StatusBadRequest)
+		log.Printf("Error creating new user: %v", err)
+		http.Error(w, "Error creating new user", http.StatusInternalServerError)
 		return
 	}
 
-	_, err = app.Collection.InsertOne(context.Background(), bson.M{
-		"user_name": userName,
-		"task_name": taskName,
-		"due_date":  dueDateTime,
-		"completed": false,
-	})
+	task := Task{
+		TaskID:    primitive.NewObjectID(),
+		TaskName:  taskName,
+		DueDate:   dueDate,
+		Completed: false,
+		UserID:    user.UserID,
+	}
+
+	_, err = app.Tasks.InsertOne(context.Background(), task)
 	if err != nil {
 		log.Printf("Error inserting task: %v", err)
 		http.Error(w, "Error inserting task", http.StatusInternalServerError)

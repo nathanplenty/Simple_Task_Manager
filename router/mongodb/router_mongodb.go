@@ -1,10 +1,9 @@
-package routerMongodb
+package routerMongoDB
 
 import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"strconv"
 )
 
 type TaskHandler interface {
@@ -12,10 +11,10 @@ type TaskHandler interface {
 }
 
 type TaskManager interface {
-	GetTaskByID(w http.ResponseWriter, taskID int)
-	UpdateTask(w http.ResponseWriter, taskID, userID int)
-	DeleteTask(w http.ResponseWriter, taskID, userID int)
-	GetTasks(w http.ResponseWriter, r *http.Request)
+	GetTaskByID(w http.ResponseWriter, taskID, userID string)
+	UpdateTask(w http.ResponseWriter, taskID, userID string)
+	DeleteTask(w http.ResponseWriter, taskID, userID string)
+	GetTasks(w http.ResponseWriter)
 	CreateTask(w http.ResponseWriter, userName, taskName, dueDate string)
 }
 
@@ -24,48 +23,30 @@ type App struct {
 }
 
 func (app *App) HandleTasks(w http.ResponseWriter, r *http.Request) {
-	query := r.URL.Query()
+	vars := r.URL.Query()
+	taskIDStr := vars.Get("task_id")
+	userIDStr := vars.Get("user_id")
 
-	taskIDStr := query.Get("task_id")
 	if taskIDStr != "" {
-		taskID, err := strconv.Atoi(taskIDStr)
-		if err != nil {
-			log.Println("Invalid task_id parameter:", err)
-			http.Error(w, "Invalid task_id parameter", http.StatusBadRequest)
-			return
-		}
-
 		switch r.Method {
 		case http.MethodGet:
-			app.TaskManager.GetTaskByID(w, taskID)
+			app.TaskManager.GetTaskByID(w, taskIDStr, userIDStr)
 		case http.MethodPatch:
-			userIDStr := query.Get("user_id")
+			userIDStr := vars.Get("user_id")
 			if userIDStr == "" {
 				log.Println("Missing user_id parameter")
 				http.Error(w, "Missing user_id parameter", http.StatusBadRequest)
 				return
 			}
-			userID, err := strconv.Atoi(userIDStr)
-			if err != nil {
-				log.Println("Invalid user_id parameter:", err)
-				http.Error(w, "Invalid user_id parameter", http.StatusBadRequest)
-				return
-			}
-			app.TaskManager.UpdateTask(w, taskID, userID)
+			app.TaskManager.UpdateTask(w, taskIDStr, userIDStr)
 		case http.MethodDelete:
-			userIDStr := query.Get("user_id")
+			userIDStr := vars.Get("user_id")
 			if userIDStr == "" {
 				log.Println("Missing user_id parameter")
 				http.Error(w, "Missing user_id parameter", http.StatusBadRequest)
 				return
 			}
-			userID, err := strconv.Atoi(userIDStr)
-			if err != nil {
-				log.Println("Invalid user_id parameter:", err)
-				http.Error(w, "Invalid user_id parameter", http.StatusBadRequest)
-				return
-			}
-			app.TaskManager.DeleteTask(w, taskID, userID)
+			app.TaskManager.DeleteTask(w, taskIDStr, userIDStr)
 		default:
 			log.Printf("Method %s not allowed", r.Method)
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -73,7 +54,7 @@ func (app *App) HandleTasks(w http.ResponseWriter, r *http.Request) {
 	} else {
 		switch r.Method {
 		case http.MethodGet:
-			app.TaskManager.GetTasks(w, r)
+			app.TaskManager.GetTasks(w)
 		case http.MethodPost:
 			var requestBody struct {
 				UserName string `json:"user_name"`

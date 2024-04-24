@@ -1,76 +1,46 @@
-package databaseMongodb
+package databaseMongoDB
 
 import (
 	"context"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 	"log"
 	"time"
+
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type DBManager interface {
-	OpenDatabase() (*mongo.Client, error)
-	InitializeDatabase(client *mongo.Client) error
+	OpenDatabase() (*mongo.Database, error)
+	InitializeDatabase() error
 }
 
 type MongoDB struct {
 	ConnectionString string
+	DatabaseName     string
 }
 
-func NewMongoDB(connectionString string) *MongoDB {
-	return &MongoDB{ConnectionString: connectionString}
-}
-
-func (db *MongoDB) OpenDatabase() (*mongo.Client, error) {
-	clientOptions := options.Client().ApplyURI(db.ConnectionString)
-	client, err := mongo.Connect(context.Background(), clientOptions)
-	if err != nil {
-		return nil, err
+func NewMongoDB(connectionString, databaseName string) *MongoDB {
+	return &MongoDB{
+		ConnectionString: connectionString,
+		DatabaseName:     databaseName,
 	}
+}
+
+func (db *MongoDB) OpenDatabase() (*mongo.Database, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	err = client.Ping(ctx, nil)
+
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(db.ConnectionString))
 	if err != nil {
+		log.Fatalf("Error creating MongoDB client: %v", err)
 		return nil, err
 	}
-	log.Println("Connected to MongoDB!")
-	return client, nil
+
+	database := client.Database(db.DatabaseName)
+	return database, nil
 }
 
-func (db *MongoDB) InitializeDatabase(client *mongo.Client) error {
-	database := client.Database("mongo_db")
-
-	collections := []struct {
-		Name   string
-		Schema interface{}
-	}{
-		{
-			Name: "users",
-			Schema: bson.D{
-				{"user_id", 0},
-				{"user_name", ""},
-			},
-		},
-		{
-			Name: "tasks",
-			Schema: bson.D{
-				{"task_id", 0},
-				{"user_id", 0},
-				{"task_name", ""},
-				{"due_date", time.Now()},
-				{"completed", false},
-			},
-		},
-	}
-
-	for _, col := range collections {
-		_, err := database.Collection(col.Name).InsertOne(context.Background(), col.Schema)
-		if err != nil {
-			return err
-		}
-	}
-
-	log.Println("Database initialized successfully!")
+func (db *MongoDB) InitializeDatabase() error {
+	log.Println("MongoDB initialized successfully")
 	return nil
 }
