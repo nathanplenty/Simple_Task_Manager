@@ -6,9 +6,11 @@ import (
 	"strconv"
 )
 
-type Task struct {
-	ID        int    `json:"id"`
-	Task      string `json:"task"`
+type Data struct {
+	TaskID    int    `json:"task_id"`
+	TaskName  string `json:"task_name"`
+	UserID    int    `json:"user_id"`
+	UserName  string `json:"user_name"`
 	DueDate   string `json:"due_date"`
 	Completed bool   `json:"completed"`
 }
@@ -21,50 +23,28 @@ func NewController(db *Database) *Controller {
 	return &Controller{db}
 }
 
-func (c *Controller) GetAllTasks(w http.ResponseWriter) {
-	rows, err := c.db.db.Query("SELECT * FROM tasks")
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	defer rows.Close()
-
-	var tasks []Task
-	for rows.Next() {
-		var task Task
-		if err := rows.Scan(&task.ID, &task.Task, &task.DueDate, &task.Completed); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		tasks = append(tasks, task)
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(tasks)
-}
-
 func (c *Controller) AddTask(w http.ResponseWriter, r *http.Request) {
-	var task Task
-	if err := json.NewDecoder(r.Body).Decode(&task); err != nil {
+	var data Data
+	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	result, err := c.db.db.Exec("INSERT INTO tasks (task, due_date, completed) VALUES (?, ?, ?)",
-		task.Task, task.DueDate, task.Completed)
+	result, err := c.db.db.Exec("INSERT INTO tasks (task, due_date, completed, user_id) VALUES (?, ?, ?, ?)",
+		data.TaskName, data.DueDate, data.Completed, data.UserID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	lastID, _ := result.LastInsertId()
-	task.ID = int(lastID)
+	data.TaskID = int(lastID)
 
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(task)
+	json.NewEncoder(w).Encode(data)
 }
 
-func (c *Controller) DeleteTask(w http.ResponseWriter, r *http.Request) {
+func (c *Controller) DeleteTaskByID(w http.ResponseWriter, r *http.Request) {
 	idStr := r.URL.Query().Get("id")
 	if idStr == "" {
 		http.Error(w, "Task ID is required", http.StatusBadRequest)
@@ -86,7 +66,60 @@ func (c *Controller) DeleteTask(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func (c *Controller) UpdateTask(w http.ResponseWriter, r *http.Request) {
+func (c *Controller) GetTaskAll(w http.ResponseWriter, r *http.Request) {
+	userID := r.URL.Query().Get("user_id")
+	query := "SELECT * FROM tasks"
+	if userID != "" {
+		query += " WHERE user_id = " + userID
+	}
+
+	rows, err := c.db.db.Query(query)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var tasks []Data
+	for rows.Next() {
+		var data Data
+		if err := rows.Scan(&data.TaskID, &data.TaskName, &data.DueDate, &data.Completed, &data.UserID); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		tasks = append(tasks, data)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(tasks)
+}
+
+func (c *Controller) GetTaskByID(w http.ResponseWriter, r *http.Request) {
+	idStr := r.URL.Query().Get("id")
+	if idStr == "" {
+		http.Error(w, "Task ID is required", http.StatusBadRequest)
+		return
+	}
+
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "Invalid Task ID", http.StatusBadRequest)
+		return
+	}
+
+	var data Data
+	err = c.db.db.QueryRow("SELECT id, task, due_date, completed, user_id FROM tasks WHERE id=?", id).Scan(
+		&data.TaskID, &data.TaskName, &data.DueDate, &data.Completed, &data.UserID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(data)
+}
+
+func (c *Controller) UpdateTaskByID(w http.ResponseWriter, r *http.Request) {
 	idStr := r.URL.Query().Get("id")
 	if idStr == "" {
 		http.Error(w, "Task ID is required", http.StatusBadRequest)

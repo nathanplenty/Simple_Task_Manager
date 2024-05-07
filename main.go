@@ -34,12 +34,13 @@ func setupSQL() {
 
 	controller := sql.NewController(db)
 
-	http.HandleFunc("/tasks", func(w http.ResponseWriter, r *http.Request) {
-		controller.GetAllTasks(w)
+	http.HandleFunc("/task/all", func(w http.ResponseWriter, r *http.Request) {
+		controller.GetTaskAll(w, r)
 	})
 	http.HandleFunc("/tasks/add", controller.AddTask)
-	http.HandleFunc("/tasks/delete", controller.DeleteTask)
-	http.HandleFunc("/tasks/update", controller.UpdateTask)
+	http.HandleFunc("/tasks/delete", controller.DeleteTaskByID)
+	http.HandleFunc("/tasks/update", controller.UpdateTaskByID)
+	http.HandleFunc("/tasks/byID", controller.GetTaskByID)
 
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
