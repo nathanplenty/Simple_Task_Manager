@@ -8,8 +8,8 @@ import (
 type DatabaseType string
 
 const (
-	SQLite  DatabaseType = "sqlite"
-	MongoDB DatabaseType = "mongodb"
+	SQLite DatabaseType = "sqlite"
+	Mongo  DatabaseType = "mongodb"
 )
 
 // NewDatabase creates a new database instance based on the specified type
@@ -17,7 +17,7 @@ func NewDatabase(dbType DatabaseType, dbPath string) (Database, error) {
 	switch dbType {
 	case SQLite:
 		return NewSQLiteDB(dbPath), nil
-	case MongoDB:
+	case Mongo:
 		return NewMongoDB(dbPath), nil
 	default:
 		return nil, errors.New("unsupported database type")

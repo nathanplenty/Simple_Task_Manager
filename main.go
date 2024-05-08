@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	dbType := "Beispiel"
+	dbType := "sqlite"
 
 	db, err := database.NewDatabase(dbType)
 	if err != nil {
