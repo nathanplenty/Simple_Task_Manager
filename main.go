@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-	option := 1
+	option := 2
 
 	switch option {
 	case 1:
@@ -48,13 +48,14 @@ func setupSQL() {
 func setupMongoDB() {
 	collection := mongodb.NewCollection()
 	controller := mongodb.NewController(collection)
+	router := http.NewServeMux()
 
-	http.HandleFunc("/tasks", func(w http.ResponseWriter, r *http.Request) {
+	router.HandleFunc("/tasks", func(w http.ResponseWriter, r *http.Request) {
 		controller.GetAllTasks(w)
 	})
-	http.HandleFunc("/tasks/add", controller.AddTask)
-	http.HandleFunc("/tasks/delete", controller.DeleteTask)
-	http.HandleFunc("/tasks/update", controller.UpdateTask)
+	router.HandleFunc("/tasks/add", controller.AddTask())
+	router.HandleFunc("/tasks/delete", controller.DeleteTask)
+	router.HandleFunc("/tasks/update", controller.UpdateTask)
 
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Fatal(http.ListenAndServe(":8080", router))
 }

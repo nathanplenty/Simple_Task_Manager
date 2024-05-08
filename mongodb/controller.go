@@ -3,6 +3,7 @@ package mongodb
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"net/http"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -41,21 +42,25 @@ func (c *Controller) GetAllTasks(w http.ResponseWriter) {
 	json.NewEncoder(w).Encode(tasks)
 }
 
-func (c *Controller) AddTask(w http.ResponseWriter, r *http.Request) {
-	var task Task
-	if err := json.NewDecoder(r.Body).Decode(&task); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
+func (c *Controller) AddTask() func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var task Task
+		if err := json.NewDecoder(r.Body).Decode(&task); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 
-	_, err := c.collection.InsertOne(context.Background(), task)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+		log.Println("Task: ", task)
 
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(task)
+		_, err := c.collection.InsertOne(context.Background(), task)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(task)
+	}
 }
 
 func (c *Controller) DeleteTask(w http.ResponseWriter, r *http.Request) {
