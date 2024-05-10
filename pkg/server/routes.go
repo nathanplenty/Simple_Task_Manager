@@ -62,7 +62,7 @@ func (s *Server) handleRequest(w http.ResponseWriter, r *http.Request, handler f
 
 // createUser handles the creation of a new user.
 func (s *Server) createUser(w http.ResponseWriter, r *http.Request) {
-	s.handleRequest(w, r, func(task domain.Task, user domain.User) error {
+	s.handleRequest(w, r, func(_ domain.Task, user domain.User) error {
 		return s.DB.CreateUser(&user)
 	})
 }
