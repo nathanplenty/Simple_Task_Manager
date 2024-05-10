@@ -3,8 +3,11 @@ package database
 import (
 	"Simple_Task_Manager/pkg/domain"
 	"context"
+	"errors"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"log"
+	"strings"
 )
 
 // MongoDB represents the MongoDB database
@@ -20,8 +23,8 @@ func NewMongoDB() *MongoDB {
 }
 
 // Connect connects to the MongoDB database
-func (m *MongoDB) Connect(database *Database) error {
-	clientOptions := options.Client().ApplyURI(connectionURI)
+func (m *MongoDB) Connect(connectionString string) error {
+	clientOptions := options.Client().ApplyURI(connectionString)
 	client, err := mongo.Connect(context.Background(), clientOptions)
 	if err != nil {
 		return err
@@ -31,12 +34,17 @@ func (m *MongoDB) Connect(database *Database) error {
 		return err
 	}
 	m.client = client
-	m.database = client.Database(dbName)
-	m.collection = m.database.Collection(collectionName)
+	parts := strings.Split(connectionString, " ")
+	if len(parts) != 3 {
+		return errors.New("invalid connection string format")
+	}
+	m.database = client.Database(parts[1])
+	m.collection = m.database.Collection(parts[2])
 	return nil
 }
 
 func (m *MongoDB) CreateTask(task *domain.Task, user *domain.User) error {
+	log.Println("Text for CreateTask")
 	return nil
 }
 

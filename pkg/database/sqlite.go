@@ -19,8 +19,8 @@ func NewSQLiteDB() *SQLiteDB {
 }
 
 // Connect connects to the SQLite database
-func (s *SQLiteDB) Connect(database *Database) error {
-	db, err := sql.Open("sqlite3", database)
+func (s *SQLiteDB) Connect(dbPath string) error {
+	db, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
 		return err
 	}

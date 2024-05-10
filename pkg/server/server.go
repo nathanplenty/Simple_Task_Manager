@@ -4,6 +4,7 @@ import (
 	"Simple_Task_Manager/pkg/database"
 	"log"
 	"net/http"
+	"strconv"
 )
 
 // Server represents the HTTP server
@@ -25,8 +26,12 @@ func (s *Server) SetupRoutes() {
 	http.HandleFunc("/tasks/delete", s.deleteTask)
 }
 
-// Run starts the server
-func (s *Server) Run() {
-	log.Println("Server is running on http://localhost:8080")
-	log.Fatal(http.ListenAndServe(":8080", nil))
+// StartServer starts the HTTP server on the specified port
+func (s *Server) StartServer(port int) error {
+	addr := ":" + strconv.Itoa(port)
+	err := http.ListenAndServe(addr, nil)
+	if err != nil {
+		log.Fatalf("Failed to start server on port %d: %v", port, err)
+	}
+	return nil
 }

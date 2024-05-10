@@ -6,7 +6,7 @@ import (
 
 // Database interface defines the methods for interacting with the database
 type Database interface {
-	Connect(database *Database) error
+	Connect(dbPath string) error
 	CreateTask(task *domain.Task, user *domain.User) error
 	ReadTask(task *domain.Task, user *domain.User) error
 	UpdateTask(task *domain.Task, user *domain.User) error
