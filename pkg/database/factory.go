@@ -4,22 +4,22 @@ import (
 	"errors"
 )
 
-// DatabaseType defines the supported database types
-type DatabaseType string
+// SelectDatabaseType defines the supported database types
+type SelectDatabaseType string
 
 const (
-	SQLite DatabaseType = "sqlite"
-	Mongo  DatabaseType = "mongodb"
+	SQLite SelectDatabaseType = "sqlite"
+	Mongo  SelectDatabaseType = "mongodb"
 )
 
 // NewDatabase creates a new database instance based on the specified type
-func NewDatabase(dbType DatabaseType, dbPath string) (Database, error) {
+func NewDatabase(dbType SelectDatabaseType) (Database, error) {
 	switch dbType {
 	case SQLite:
-		return NewSQLiteDB(dbPath), nil
+		return NewSQLiteDB(), nil
 	case Mongo:
-		return NewMongoDB(dbPath), nil
+		return NewMongoDB(), nil
 	default:
-		return nil, errors.New("unsupported database type")
+		return nil, errors.New("unsupported database type: " + string(dbType))
 	}
 }
