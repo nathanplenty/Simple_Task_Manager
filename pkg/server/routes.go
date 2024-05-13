@@ -8,30 +8,49 @@ import (
 	"net/http"
 )
 
-// logBody parses a JSON-encoded request body and logs its contents.
+// logBody parses a JSON-encoded request body.
 func logBody(w http.ResponseWriter, r *http.Request) (task domain.Task, user domain.User, err error) {
 	bodyBytes, err := io.ReadAll(r.Body)
+
 	if err != nil {
 		http.Error(w, "Failed to read request body", http.StatusBadRequest)
 		log.Printf("Failed to read request body: %v", err)
 		return domain.Task{}, domain.User{}, err
 	}
 
-	var temp struct {
-		Task domain.Task `json:"task"`
-		User domain.User `json:"user"`
-	}
-
-	err = json.Unmarshal(bodyBytes, &temp)
-	if err != nil {
+	var bodyData map[string]interface{}
+	if err = json.Unmarshal(bodyBytes, &bodyData); err != nil {
 		http.Error(w, "Failed to decode request body", http.StatusBadRequest)
 		log.Printf("Failed to decode request body: %v", err)
 		return domain.Task{}, domain.User{}, err
 	}
 
-	log.Printf("Raw request body: %s", bodyBytes)
+	user = domain.User{}
+	task = domain.Task{}
 
-	return temp.Task, temp.User, nil
+	if val, ok := bodyData["user_id"].(string); ok {
+		user.UserID = val
+	}
+	if val, ok := bodyData["user_name"].(string); ok {
+		user.UserName = val
+	}
+	if val, ok := bodyData["password"].(string); ok {
+		user.Password = val
+	}
+	if val, ok := bodyData["task_id"].(string); ok {
+		task.TaskID = val
+	}
+	if val, ok := bodyData["task_name"].(string); ok {
+		task.TaskName = val
+	}
+	if val, ok := bodyData["due_date"].(string); ok {
+		task.DueDate = val
+	}
+	if val, ok := bodyData["completed"].(string); ok {
+		task.Completed = val
+	}
+
+	return task, user, nil
 }
 
 // encodeJSON encodes a value to JSON format and writes it to the response writer.
@@ -45,6 +64,8 @@ func encodeJSON(w http.ResponseWriter, v interface{}) {
 
 // handleRequest handles related requests.
 func (s *Server) handleRequest(w http.ResponseWriter, r *http.Request, handler func(task domain.Task, user domain.User) error) {
+	log.Printf("Request Method: %s, URL: %s", r.Method, r.URL.Path)
+
 	task, user, err := logBody(w, r)
 	if err != nil {
 		return
@@ -57,13 +78,14 @@ func (s *Server) handleRequest(w http.ResponseWriter, r *http.Request, handler f
 	}
 
 	w.WriteHeader(http.StatusOK)
-	encodeJSON(w, task)
+	encodeJSON(w, "Request successfully executed")
 }
 
 // createUser handles the creation of a new user.
 func (s *Server) createUser(w http.ResponseWriter, r *http.Request) {
 	s.handleRequest(w, r, func(_ domain.Task, user domain.User) error {
-		return s.DB.CreateUser(&user)
+		newUser := domain.NewUser(user.UserID, user.UserName, user.Password)
+		return s.DB.CreateUser(newUser)
 	})
 }
 

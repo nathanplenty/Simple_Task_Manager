@@ -6,6 +6,7 @@ import (
 	"errors"
 	_ "github.com/mattn/go-sqlite3"
 	"log"
+	"os"
 )
 
 // SQLiteDB represents the SQLite database
@@ -19,14 +20,29 @@ func NewSQLiteDB(dbPath string) (*SQLiteDB, error) {
 	if err := db.Connect(dbPath); err != nil {
 		return nil, err
 	}
-	if err := db.InitializeDatabase(); err != nil {
+	if err := db.InitializeDatabase(dbPath); err != nil {
 		return nil, err
 	}
 	return db, nil
 }
 
 // InitializeDatabase initializes the SQLite database
-func (s *SQLiteDB) InitializeDatabase() error {
+func (s *SQLiteDB) InitializeDatabase(dbPath string) error {
+	_, err := os.Stat(dbPath)
+	if os.IsNotExist(err) {
+		if err = s.createDatabaseTables(); err != nil {
+			return err
+		}
+		log.Println("Database created successfully")
+	} else {
+		log.Println("Database reused successfully")
+	}
+
+	return nil
+}
+
+// createDatabaseTables creates the SQLite database
+func (s *SQLiteDB) createDatabaseTables() error {
 	_, err := s.db.Exec(`
         CREATE TABLE IF NOT EXISTS users (
             user_id INTEGER PRIMARY KEY,
@@ -54,7 +70,6 @@ func (s *SQLiteDB) InitializeDatabase() error {
 		return err
 	}
 
-	log.Println("Database created successfully")
 	return nil
 }
 
@@ -69,10 +84,24 @@ func (s *SQLiteDB) Connect(dbPath string) error {
 	return nil
 }
 
-// CreateUser creates a new user in the SQLite database
+// CreateUser creates a new user in the SQLite database if the user does not already exist
 func (s *SQLiteDB) CreateUser(user *domain.User) error {
-	_, err := s.db.Exec("INSERT INTO users (user_name, password) VALUES (?, ?)", user.UserName, user.Password)
-	return err
+	err := s.CheckUser(user)
+	if err == nil {
+		return errors.New("user already exists")
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		log.Printf("Error checking user existence: %v", err)
+		return err
+	}
+
+	result, err := s.db.Exec("INSERT INTO users (user_name, password) VALUES (?, ?)", user.UserName, user.Password)
+	if err != nil {
+		log.Printf("Error inserting user into database: %v", err)
+		return err
+	}
+	rowsAffected, _ := result.RowsAffected()
+	log.Printf("Rows affected after creating user: %d", rowsAffected)
+	return nil
 }
 
 // CheckUser checks if a user exists in the SQLite database
