@@ -14,8 +14,15 @@ type SQLiteDB struct {
 }
 
 // NewSQLiteDB creates a new instance of SQLiteDB
-func NewSQLiteDB() *SQLiteDB {
-	return &SQLiteDB{}
+func NewSQLiteDB(dbPath string) (*SQLiteDB, error) {
+	db := &SQLiteDB{}
+	if err := db.Connect(dbPath); err != nil {
+		return nil, err
+	}
+	if err := db.InitializeDatabase(); err != nil {
+		return nil, err
+	}
+	return db, nil
 }
 
 // InitializeDatabase initializes the SQLite database

@@ -7,11 +7,14 @@ import (
 )
 
 func main() {
-	// Database type - Change manually
+	// Database path - Manually change
+	dbPath := "./database.db"
+
+	// Database type - Manually change
 	dbType := "sqlite"
 
 	// Create a new database instance based on the specified dbType
-	db, err := database.NewDatabase(database.SelectDatabaseType(dbType))
+	db, err := database.NewDatabase(database.SelectDatabaseType(dbType), dbPath)
 	if err != nil {
 		log.Fatalf("Failed to create database: %v", err)
 	}

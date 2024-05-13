@@ -13,10 +13,10 @@ const (
 )
 
 // NewDatabase creates a new database instance based on the specified type
-func NewDatabase(dbType SelectDatabaseType) (Database, error) {
+func NewDatabase(dbType SelectDatabaseType, dbPath string) (Database, error) {
 	switch dbType {
 	case SQLite:
-		return NewSQLiteDB(), nil
+		return NewSQLiteDB(dbPath)
 	case Mongo:
 		return NewMongoDB(), nil
 	default:
