@@ -72,6 +72,7 @@ func (s *Server) handleRequest(w http.ResponseWriter, r *http.Request, handler f
 	}
 
 	err = handler(task, user)
+
 	if err != nil {
 		http.Error(w, "Failed to handle request", http.StatusInternalServerError)
 		return
@@ -83,6 +84,7 @@ func (s *Server) handleRequest(w http.ResponseWriter, r *http.Request, handler f
 
 // createUser handles the creation of a new user.
 func (s *Server) createUser(w http.ResponseWriter, r *http.Request) {
+	log.Println("Request Function: routes/createUser()")
 	s.handleRequest(w, r, func(_ domain.Task, user domain.User) error {
 		newUser := domain.NewUser(user.UserID, user.UserName, user.Password)
 		return s.DB.CreateUser(newUser)

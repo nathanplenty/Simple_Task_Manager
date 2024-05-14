@@ -84,10 +84,12 @@ func (s *SQLiteDB) Connect(dbPath string) error {
 	return nil
 }
 
-// CreateUser creates a new user in the SQLite database if the user does not already exist
+// CreateUser creates a new user in the SQLite database and returns the new user_id
 func (s *SQLiteDB) CreateUser(user *domain.User) error {
+	log.Println("Request Function: sqlite/CreateUser()")
 	err := s.CheckUser(user)
-	if err == nil {
+	if err != nil {
+		log.Println("User already exists")
 		return errors.New("user already exists")
 	} else if !errors.Is(err, sql.ErrNoRows) {
 		log.Printf("Error checking user existence: %v", err)
@@ -99,44 +101,109 @@ func (s *SQLiteDB) CreateUser(user *domain.User) error {
 		log.Printf("Error inserting user into database: %v", err)
 		return err
 	}
-	rowsAffected, _ := result.RowsAffected()
-	log.Printf("Rows affected after creating user: %d", rowsAffected)
+
+	lastInsertID, err := result.LastInsertId()
+	if err != nil {
+		log.Printf("Error getting last insert ID: %v", err)
+		return err
+	}
+
+	userIDInt := int(lastInsertID)
+
+	log.Printf("New user created with ID: %d", userIDInt)
 	return nil
 }
 
 // CheckUser checks if a user exists in the SQLite database
 func (s *SQLiteDB) CheckUser(user *domain.User) error {
+	log.Println("Request Function: sqlite/CheckUser()")
 	var userID int
-	err := s.db.QueryRow("SELECT user_id FROM users WHERE user_name=? AND password=?", user.UserName, user.Password).Scan(&userID)
+	err := s.db.QueryRow("SELECT user_id FROM users WHERE user_name=?", user.UserName).Scan(&userID)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil
+		return err
 	}
-	return err
+	return nil
+}
+
+// CheckPassword checks if a user's password is correct in the database
+func (s *SQLiteDB) CheckPassword(user *domain.User) error {
+	var storedPassword string
+	err := s.db.QueryRow("SELECT password FROM users WHERE user_name=?", user.UserName).Scan(&storedPassword)
+	if errors.Is(err, sql.ErrNoRows) {
+		return errors.New("user not found")
+	}
+	if err != nil {
+		return err
+	}
+	if storedPassword != user.Password {
+		return errors.New("incorrect password")
+	}
+	return nil
 }
 
 // CreateTask creates a new task in the SQLite database
 func (s *SQLiteDB) CreateTask(task *domain.Task, user *domain.User) error {
-	_, err := s.db.Exec("INSERT INTO tasks (task_name, due_date, completed, user_id) VALUES (?, ?, ?, ?)",
+	err := s.CheckUser(user)
+	if err != nil {
+		return err
+	}
+
+	if err = s.CheckPassword(user); err != nil {
+		return err
+	}
+
+	result, err := s.db.Exec("INSERT INTO tasks (task_name, due_date, completed, user_id) VALUES (?, ?, ?, ?)",
 		task.TaskName, task.DueDate, false, user.UserID)
-	return err
+	if err != nil {
+		return err
+	}
+
+	taskID, err := result.LastInsertId()
+	log.Printf("New task created with ID: %d", taskID)
+	return nil
 }
 
-// ReadTask liest eine Aufgabe aus der SQLite-Datenbank
+// ReadTask reads a task from the SQLite database
 func (s *SQLiteDB) ReadTask(task *domain.Task, user *domain.User) error {
-	err := s.db.QueryRow("SELECT task_id, task_name, due_date, completed FROM tasks WHERE task_id=? AND user_id=?",
-		task.TaskID, user.UserID).Scan(&task.TaskID, &task.TaskName, &task.DueDate, &task.Completed)
+	if err := s.CheckUser(user); err != nil {
+		return err
+	}
+
+	if err := s.CheckPassword(user); err != nil {
+		return err
+	}
+
+	err := s.db.QueryRow("SELECT task_id, task_name, due_date, completed FROM tasks WHERE task_id=? AND user_id=(SELECT user_id FROM users WHERE user_name = ?)",
+		task.TaskID, user.UserName).Scan(&task.TaskID, &task.TaskName, &task.DueDate, &task.Completed)
 	return err
 }
 
-// UpdateTask aktualisiert eine Aufgabe in der SQLite-Datenbank
+// UpdateTask updates a task in the SQLite database
 func (s *SQLiteDB) UpdateTask(task *domain.Task, user *domain.User) error {
-	_, err := s.db.Exec("UPDATE tasks SET task_name=?, due_date=?, completed=? WHERE task_id=? AND user_id=?",
-		task.TaskName, task.DueDate, task.Completed, task.TaskID, user.UserID)
+	if err := s.CheckUser(user); err != nil {
+		return err
+	}
+
+	if err := s.CheckPassword(user); err != nil {
+		return err
+	}
+
+	_, err := s.db.Exec("UPDATE tasks SET task_name=?, due_date=?, completed=? WHERE task_id=? AND user_id=(SELECT user_id FROM users WHERE user_name = ?)",
+		task.TaskName, task.DueDate, task.Completed, task.TaskID, user.UserName)
 	return err
 }
 
-// DeleteTask löscht eine Aufgabe aus der SQLite-Datenbank
+// DeleteTask deletes a task from the SQLite database
 func (s *SQLiteDB) DeleteTask(task *domain.Task, user *domain.User) error {
-	_, err := s.db.Exec("DELETE FROM tasks WHERE task_id=? AND user_id=?", task.TaskID, user.UserID)
+	if err := s.CheckUser(user); err != nil {
+		return err
+	}
+
+	if err := s.CheckPassword(user); err != nil {
+		return err
+	}
+
+	_, err := s.db.Exec("DELETE FROM tasks WHERE task_id=? AND user_id=(SELECT user_id FROM users WHERE user_name = ?)",
+		task.TaskID, user.UserName)
 	return err
 }
