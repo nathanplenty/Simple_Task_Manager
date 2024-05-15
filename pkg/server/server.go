@@ -12,7 +12,6 @@ type Server struct {
 	DB database.Database
 }
 
-// NewServer creates a new instance of Server
 func NewServer(db database.Database) *Server {
 	return &Server{DB: db}
 }

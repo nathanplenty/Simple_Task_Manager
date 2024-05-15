@@ -87,6 +87,7 @@ func (s *SQLiteDB) Connect(dbPath string) error {
 // CreateUser creates a new user in the SQLite database and returns the new user_id
 func (s *SQLiteDB) CreateUser(user *domain.User) error {
 	log.Println("Request Function: sqlite/CreateUser()")
+
 	err := s.CheckUser(user)
 	if err != nil {
 		log.Println("User already exists")
@@ -116,7 +117,6 @@ func (s *SQLiteDB) CreateUser(user *domain.User) error {
 
 // CheckUser checks if a user exists in the SQLite database
 func (s *SQLiteDB) CheckUser(user *domain.User) error {
-	log.Println("Request Function: sqlite/CheckUser()")
 	var userID int
 	err := s.db.QueryRow("SELECT user_id FROM users WHERE user_name=?", user.UserName).Scan(&userID)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -143,8 +143,14 @@ func (s *SQLiteDB) CheckPassword(user *domain.User) error {
 
 // CreateTask creates a new task in the SQLite database
 func (s *SQLiteDB) CreateTask(task *domain.Task, user *domain.User) error {
-	err := s.CheckUser(user)
+	if err := s.CheckUser(user); err != nil {
+		return err
+	}
+
+	var userID int
+	err := s.db.QueryRow("SELECT user_id FROM users WHERE user_name=?", user.UserName).Scan(&userID)
 	if err != nil {
+		log.Println("Error querying the database for user ID:", err)
 		return err
 	}
 
@@ -153,13 +159,17 @@ func (s *SQLiteDB) CreateTask(task *domain.Task, user *domain.User) error {
 	}
 
 	result, err := s.db.Exec("INSERT INTO tasks (task_name, due_date, completed, user_id) VALUES (?, ?, ?, ?)",
-		task.TaskName, task.DueDate, false, user.UserID)
+		task.TaskName, task.DueDate, false, userID)
 	if err != nil {
 		return err
 	}
 
 	taskID, err := result.LastInsertId()
-	log.Printf("New task created with ID: %d", taskID)
+	if err != nil {
+		return err
+	}
+
+	log.Println("New task created with ID:", taskID, ", with userID:", userID)
 	return nil
 }
 
@@ -188,9 +198,30 @@ func (s *SQLiteDB) UpdateTask(task *domain.Task, user *domain.User) error {
 		return err
 	}
 
-	_, err := s.db.Exec("UPDATE tasks SET task_name=?, due_date=?, completed=? WHERE task_id=? AND user_id=(SELECT user_id FROM users WHERE user_name = ?)",
-		task.TaskName, task.DueDate, task.Completed, task.TaskID, user.UserName)
-	return err
+	var userID int
+	err := s.db.QueryRow("SELECT user_id FROM users WHERE user_name=?", user.UserName).Scan(&userID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			log.Println("No matching user found!")
+			return err
+		}
+		log.Println("Error querying the database for user ID:", err)
+		return err
+	}
+
+	err = s.db.QueryRow("SELECT task_id, task_name, due_date, completed FROM tasks WHERE task_name=? AND user_id=?",
+		task.TaskName, userID).Scan(&task.TaskID, &task.TaskName, &task.DueDate, &task.Completed)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			log.Println("No matching task found!")
+			return err
+		}
+		log.Println("Error querying the database for task:", err)
+		return err
+	}
+
+	log.Println("Task updated with Task Name:", task.TaskName, "for User ID:", userID)
+	return nil
 }
 
 // DeleteTask deletes a task from the SQLite database
