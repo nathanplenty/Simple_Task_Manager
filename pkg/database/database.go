@@ -14,3 +14,7 @@ type Database interface {
 	UpdateTask(task *domain.Task, user *domain.User) error
 	DeleteTask(task *domain.Task, user *domain.User) error
 }
+
+// Das hier ist ein Repo/Layer
+// Ich will aber hier ein "Vertrag" für Datenbank
+// "Hier hast du Daten, speicher die erstmal"

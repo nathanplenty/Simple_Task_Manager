@@ -9,3 +9,6 @@ type TaskManager interface {
 	UpdateTask(task *Task, user *User) error
 	DeleteTask(task *Task, user *User) error
 }
+
+// TaskManager für Tasks
+// UserManager für User

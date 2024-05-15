@@ -23,3 +23,8 @@ func NewDatabase(dbType SelectDatabaseType, dbPath string) (Database, error) {
 		return nil, errors.New("unsupported database type: " + string(dbType))
 	}
 }
+
+//var drivers map[string]func() Database
+//drivers["mongo"] = 7
+//dbFunc, ok := drivers["mongo"]
+//return dbFunc()

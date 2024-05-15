@@ -10,6 +10,7 @@ import (
 
 // logBody parses a JSON-encoded request body.
 func logBody(w http.ResponseWriter, r *http.Request) (task domain.Task, user domain.User, err error) {
+	log.Println("Start Function router/logBody")
 	bodyBytes, err := io.ReadAll(r.Body)
 
 	if err != nil {
@@ -55,6 +56,7 @@ func logBody(w http.ResponseWriter, r *http.Request) (task domain.Task, user dom
 
 // encodeJSON encodes a value to JSON format and writes it to the response writer.
 func encodeJSON(w http.ResponseWriter, v interface{}) {
+	log.Println("Start Function router/endcodeJSON")
 	w.Header().Set("Content-Type", "application/json")
 	err := json.NewEncoder(w).Encode(v)
 	if err != nil {
@@ -64,7 +66,7 @@ func encodeJSON(w http.ResponseWriter, v interface{}) {
 
 // handleRequest handles related requests.
 func (s *Server) handleRequest(w http.ResponseWriter, r *http.Request, handler func(task domain.Task, user domain.User) error) {
-	log.Printf("Request Method: %s, URL: %s", r.Method, r.URL.Path)
+	log.Println("Start Function router/handleRequest")
 
 	task, user, err := logBody(w, r)
 	if err != nil {
@@ -73,7 +75,6 @@ func (s *Server) handleRequest(w http.ResponseWriter, r *http.Request, handler f
 
 	err = handler(task, user)
 
-	log.Println("Error", err)
 	if err != nil {
 		http.Error(w, "Failed to handle request", http.StatusInternalServerError)
 		return
@@ -85,7 +86,7 @@ func (s *Server) handleRequest(w http.ResponseWriter, r *http.Request, handler f
 
 // createUser handles the creation of a new user.
 func (s *Server) createUser(w http.ResponseWriter, r *http.Request) {
-	log.Println("Request Function: routes/createUser()")
+	log.Println("Start Function router/createUser")
 	s.handleRequest(w, r, func(task domain.Task, user domain.User) error {
 		newUser := domain.NewUser(user.UserID, user.UserName, user.Password)
 		return s.DB.CreateUser(newUser)
@@ -94,13 +95,16 @@ func (s *Server) createUser(w http.ResponseWriter, r *http.Request) {
 
 // createTask handles the creation of a new task.
 func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
+	log.Println("Start Function router/createTask")
 	s.handleRequest(w, r, func(task domain.Task, user domain.User) error {
-		return s.DB.CreateTask(&task, &user)
+		newTask := domain.NewTask(task.TaskID, task.TaskName, task.DueDate, task.Completed)
+		return s.DB.CreateTask(newTask, &user)
 	})
 }
 
 // readTask handles the retrieval of a task.
 func (s *Server) readTask(w http.ResponseWriter, r *http.Request) {
+	log.Println("Start Function router/readTask")
 	s.handleRequest(w, r, func(task domain.Task, user domain.User) error {
 		return s.DB.ReadTask(&task, &user)
 	})
@@ -108,6 +112,7 @@ func (s *Server) readTask(w http.ResponseWriter, r *http.Request) {
 
 // updateTask handles the update of a task.
 func (s *Server) updateTask(w http.ResponseWriter, r *http.Request) {
+	log.Println("Start Function router/updateTask")
 	s.handleRequest(w, r, func(task domain.Task, user domain.User) error {
 		return s.DB.UpdateTask(&task, &user)
 	})
@@ -115,6 +120,7 @@ func (s *Server) updateTask(w http.ResponseWriter, r *http.Request) {
 
 // deleteTask handles the deletion of a task.
 func (s *Server) deleteTask(w http.ResponseWriter, r *http.Request) {
+	log.Println("Start Function router/deleteTask")
 	s.handleRequest(w, r, func(task domain.Task, user domain.User) error {
 		return s.DB.DeleteTask(&task, &user)
 	})
