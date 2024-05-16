@@ -15,3 +15,9 @@ func NewUser(userid, username, password string) *User {
 		Password: password,
 	}
 }
+
+// UserManager defines the interface for managing users
+type UserManager interface {
+	CreateUser(user *User) error
+	CheckUser(user *User) error
+}
