@@ -1,6 +1,6 @@
 package domain
 
-// Task struct represents the task model
+// Task represents a task in the system
 type Task struct {
 	TaskID    string `json:"task_id"`
 	TaskName  string `json:"task_name"`
@@ -8,20 +8,12 @@ type Task struct {
 	Completed string `json:"completed"`
 }
 
-// NewTask creates and returns a new Task instance
-func NewTask(taskid, taskname, duedate, completed string) *Task {
+// NewTask creates a new Task instance
+func NewTask(taskID, taskName, dueDate, completed string) *Task {
 	return &Task{
-		TaskID:    taskid,
-		TaskName:  taskname,
-		DueDate:   duedate,
+		TaskID:    taskID,
+		TaskName:  taskName,
+		DueDate:   dueDate,
 		Completed: completed,
 	}
-}
-
-// TaskManager defines the interface for managing tasks
-type TaskManager interface {
-	CreateTask(task *Task, user *User) error
-	ReadTask(task *Task, user *User) error
-	UpdateTask(task *Task, user *User) error
-	DeleteTask(task *Task, user *User) error
 }

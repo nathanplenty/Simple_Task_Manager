@@ -10,7 +10,7 @@ import (
 
 // logBody parses a JSON-encoded request body.
 func logBody(w http.ResponseWriter, r *http.Request) (task domain.Task, user domain.User, err error) {
-	log.Println("Start Function router/logBody")
+	log.Println("Start Function logBody")
 	bodyBytes, err := io.ReadAll(r.Body)
 
 	if err != nil {
@@ -56,7 +56,7 @@ func logBody(w http.ResponseWriter, r *http.Request) (task domain.Task, user dom
 
 // encodeJSON encodes a value to JSON format and writes it to the response writer.
 func encodeJSON(w http.ResponseWriter, v interface{}) {
-	log.Println("Start Function router/endcodeJSON")
+	log.Println("Start Function encodeJSON")
 	w.Header().Set("Content-Type", "application/json")
 	err := json.NewEncoder(w).Encode(v)
 	if err != nil {
@@ -65,17 +65,24 @@ func encodeJSON(w http.ResponseWriter, v interface{}) {
 }
 
 // handleRequest handles related requests.
-func (s *Server) handleRequest(w http.ResponseWriter, r *http.Request, handler func(task domain.Task, user domain.User) error) {
-	log.Println("Start Function router/handleRequest")
+func (s *Server) handleRequest(w http.ResponseWriter, r *http.Request, handler func(task domain.Task, user domain.User, session *domain.Session) error) {
+	log.Println("Start Function handleRequest")
 
 	task, user, err := logBody(w, r)
 	if err != nil {
+		http.Error(w, "Failed to parse request body", http.StatusBadRequest)
 		return
 	}
 
-	err = handler(task, user)
+	session := s.GetSession(r) //!!!STUCK!!!
+	if session == nil {
+		http.Error(w, "Invalid session", http.StatusUnauthorized)
+		return
+	}
 
+	err = handler(task, user, session)
 	if err != nil {
+		log.Printf("Failed to handle request: %v\n", err)
 		http.Error(w, "Failed to handle request", http.StatusInternalServerError)
 		return
 	}
@@ -86,8 +93,8 @@ func (s *Server) handleRequest(w http.ResponseWriter, r *http.Request, handler f
 
 // createUser handles the creation of a new user.
 func (s *Server) createUser(w http.ResponseWriter, r *http.Request) {
-	log.Println("Start Function router/createUser")
-	s.handleRequest(w, r, func(task domain.Task, user domain.User) error {
+	log.Println("Start Function createUser")
+	s.handleRequest(w, r, func(task domain.Task, user domain.User, session *domain.Session) error {
 		newUser := domain.NewUser(user.UserID, user.UserName, user.Password)
 		return s.DB.CreateUser(newUser)
 	})
@@ -95,33 +102,65 @@ func (s *Server) createUser(w http.ResponseWriter, r *http.Request) {
 
 // createTask handles the creation of a new task.
 func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
-	log.Println("Start Function router/createTask")
-	s.handleRequest(w, r, func(task domain.Task, user domain.User) error {
+	log.Println("Start Function createTask")
+	s.handleRequest(w, r, func(task domain.Task, user domain.User, session *domain.Session) error {
 		newTask := domain.NewTask(task.TaskID, task.TaskName, task.DueDate, task.Completed)
-		return s.DB.CreateTask(newTask, &user)
+		return s.DB.CreateTask(newTask, &user, session)
 	})
 }
 
 // readTask handles the retrieval of a task.
 func (s *Server) readTask(w http.ResponseWriter, r *http.Request) {
-	log.Println("Start Function router/readTask")
-	s.handleRequest(w, r, func(task domain.Task, user domain.User) error {
-		return s.DB.ReadTask(&task, &user)
+	log.Println("Start Function readTask")
+	s.handleRequest(w, r, func(task domain.Task, user domain.User, session *domain.Session) error {
+		return s.DB.ReadTask(&task, &user, session)
 	})
 }
 
 // updateTask handles the update of a task.
 func (s *Server) updateTask(w http.ResponseWriter, r *http.Request) {
-	log.Println("Start Function router/updateTask")
-	s.handleRequest(w, r, func(task domain.Task, user domain.User) error {
-		return s.DB.UpdateTask(&task, &user)
+	log.Println("Start Function updateTask")
+	s.handleRequest(w, r, func(task domain.Task, user domain.User, session *domain.Session) error {
+		return s.DB.UpdateTask(&task, &user, session)
 	})
 }
 
 // deleteTask handles the deletion of a task.
 func (s *Server) deleteTask(w http.ResponseWriter, r *http.Request) {
-	log.Println("Start Function router/deleteTask")
-	s.handleRequest(w, r, func(task domain.Task, user domain.User) error {
-		return s.DB.DeleteTask(&task, &user)
+	log.Println("Start Function deleteTask")
+	s.handleRequest(w, r, func(task domain.Task, user domain.User, session *domain.Session) error {
+		return s.DB.DeleteTask(&task, &user, session)
 	})
+}
+
+// loginUser handles the login of a user and creates a session.
+func (s *Server) loginUser(w http.ResponseWriter, r *http.Request) {
+	log.Println("Start Function loginUser")
+
+	_, user, err := logBody(w, r)
+	if err != nil {
+		return
+	}
+
+	err = s.DB.CheckPassword(&user)
+	if err != nil {
+		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+		return
+	}
+
+	var userID int
+	err = s.DB.GetUserIDByUsername(user.UserName, &userID)
+	if err != nil {
+		http.Error(w, "Failed to get user ID", http.StatusInternalServerError)
+		return
+	}
+
+	sessionID, err := s.DB.CreateSession(userID)
+	if err != nil {
+		http.Error(w, "Failed to create session", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	encodeJSON(w, map[string]string{"session_id": sessionID})
 }

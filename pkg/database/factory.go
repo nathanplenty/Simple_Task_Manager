@@ -1,30 +1,26 @@
 package database
 
 import (
-	"errors"
+	"log"
 )
 
-// SelectDatabaseType defines the supported database types
-type SelectDatabaseType string
+// DBType is an enumeration of the supported database types
+type DBType string
 
 const (
-	SQLite SelectDatabaseType = "sqlite"
-	Mongo  SelectDatabaseType = "mongodb"
+	SQLiteDBType DBType = "sqlite"
+	MongoDBType  DBType = "mongodb"
 )
 
-// NewDatabase creates a new database instance based on the specified type
-func NewDatabase(dbType SelectDatabaseType, dbPath string) (Database, error) {
+// CreateDatabase creates a new instance of the specified database type
+func CreateDatabase(dbType DBType, connString string) (Database, error) {
+	log.Println("Start Function CreateDatabase")
 	switch dbType {
-	case SQLite:
-		return NewSQLiteDB(dbPath)
-	case Mongo:
-		return NewMongoDB(), nil
+	case SQLiteDBType:
+		return NewSQLiteDB(connString)
+	//case MongoDBType:
+	//	return NewMongoDB(connString) //Cannot use 'NewMongoDB(connString)' (type (*mongo.Database, error)) as the type DatabaseType does not implement 'Database' as some methods are missing:Connect(dbPath string) errorCreateUser(user *domain.User) errorCheckUser(user *domain.User) error…
 	default:
-		return nil, errors.New("unsupported database type: " + string(dbType))
+		return nil, nil
 	}
 }
-
-//var drivers map[string]func() Database
-//drivers["mongo"] = 7
-//dbFunc, ok := drivers["mongo"]
-//return dbFunc()
