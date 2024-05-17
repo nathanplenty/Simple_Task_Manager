@@ -18,8 +18,8 @@ func CreateDatabase(dbType DBType, connString string) (Database, error) {
 	switch dbType {
 	case SQLiteDBType:
 		return NewSQLiteDB(connString)
-	//case MongoDBType:
-	//	return NewMongoDB(connString) //Cannot use 'NewMongoDB(connString)' (type (*mongo.Database, error)) as the type DatabaseType does not implement 'Database' as some methods are missing:Connect(dbPath string) errorCreateUser(user *domain.User) errorCheckUser(user *domain.User) error…
+	case MongoDBType:
+		return NewMongoDB(connString)
 	default:
 		return nil, nil
 	}

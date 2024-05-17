@@ -4,6 +4,7 @@ import (
 	"Simple_Task_Manager/pkg/domain"
 	"context"
 	"errors"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"log"
 	"strconv"
 	"time"
@@ -17,25 +18,25 @@ type MongoDB struct {
 	database *mongo.Database
 }
 
-//// NewMongoDB creates a new instance of MongoDB
-//func NewMongoDB(connString string) (Database, error) {
-//	log.Println("Start Function NewMongoDB")
-//
-//	clientOptions := options.Client().ApplyURI(connString)
-//	client, err := mongo.Connect(context.Background(), clientOptions)
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	err = client.Ping(context.Background(), nil)
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	database := client.Database("task_manager")
-//
-//	return database, nil
-//}
+// NewMongoDB creates a new instance of MongoDB
+func NewMongoDB(connString string) (Database, error) {
+	log.Println("Start Function NewMongoDB")
+
+	clientOptions := options.Client().ApplyURI(connString)
+	client, err := mongo.Connect(context.Background(), clientOptions)
+	if err != nil {
+		return nil, err
+	}
+
+	err = client.Ping(context.Background(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	database := client.Database("task_manager")
+
+	return database, nil //STUCK!!!
+}
 
 // InitializeDatabase initializes the MongoDB database with the necessary collections and indexes
 func (m *MongoDB) InitializeDatabase() error {
