@@ -217,6 +217,21 @@ func (s *SQLiteDB) CreateTask(task *domain.Task, user *domain.User) error {
 func (s *SQLiteDB) ReadTask(task *domain.Task, user *domain.User) error {
 	log.Println("Start Function sqlite/ReadTask")
 
+	if err := s.CheckUser(user); err != nil {
+		return err
+	}
+
+	var userID int
+	err := s.db.QueryRow("SELECT user_id FROM users WHERE user_name=?", user.UserName).Scan(&userID)
+	if err != nil {
+		log.Println("Error querying the database for user ID:", err)
+		return err
+	}
+
+	if err = s.CheckPassword(user); err != nil {
+		return err
+	}
+
 	rows, err := s.db.Query("SELECT task_id, task_name, due_date, completed FROM tasks")
 	if err != nil {
 		log.Println("Error querying the database for tasks:", err)
