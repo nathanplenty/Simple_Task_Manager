@@ -18,6 +18,8 @@ func NewServer(db database.Database) *Server {
 	return &Server{DB: db}
 }
 
+// middleware hier einbauen auth(s.createuser) -> von außen nach funktion durchgehen
+
 // SetupRoutes sets up the server routes
 func (s *Server) SetupRoutes() {
 	http.HandleFunc("/createUser", s.createUser)

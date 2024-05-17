@@ -74,6 +74,15 @@ func (s *Server) handleRequest(w http.ResponseWriter, r *http.Request, handler f
 		return
 	}
 
+	// Auth ist dafür da, dass dieser mit Schnittstelle arbeiten darf
+	// Request Session geht runter in Datenbank, dass sollte nicht sein
+	// HandleRequest ist der "äußerste" Layer, hier will ich prüfen ob Anfrage authentisch ist
+	// Username Password schicken um (später JWT) session zurück schicken /login bauen, nur einloggen, mehr nicht
+	// Wenn ja, login erfolgreich 200 OK -> Später JWT zurückgeben
+	// LoginUser -> Get name und PW -> chekuser -> yes -> 200 ok / -> checkuser no -> 401 unauth
+	// Request -> Check Token -> Yes -> Request ausführen / -> No -> Login again
+	// ^ Middleware ^
+
 	session := s.GetSession(r) //!!!STUCK!!!
 	if session == nil {
 		http.Error(w, "Invalid session", http.StatusUnauthorized)
