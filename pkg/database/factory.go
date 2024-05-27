@@ -1,26 +1,25 @@
 package database
 
 import (
-	"log"
+	"errors"
 )
 
-// DBType is an enumeration of the supported database types
-type DBType string
+// SelectDatabaseType defines the supported database types
+type SelectDatabaseType string
 
 const (
-	SQLiteDBType DBType = "sqlite"
-	MongoDBType  DBType = "mongodb"
+	SQLite SelectDatabaseType = "sqlite"
+	Mongo  SelectDatabaseType = "mongodb"
 )
 
-// CreateDatabase creates a new instance of the specified database type
-func CreateDatabase(dbType DBType, connString string) (Database, error) {
-	log.Println("Start Function CreateDatabase")
+// NewDatabase creates a new database instance based on the specified type
+func NewDatabase(dbType SelectDatabaseType, dbPath string) (Database, error) {
 	switch dbType {
-	case SQLiteDBType:
-		return NewSQLiteDB(connString)
-	case MongoDBType:
-		return NewMongoDB(connString)
+	case SQLite:
+		return NewSQLiteDB(dbPath)
+	case Mongo:
+		return NewMongoDB(), nil
 	default:
-		return nil, nil
+		return nil, errors.New("unsupported database type: " + string(dbType))
 	}
 }

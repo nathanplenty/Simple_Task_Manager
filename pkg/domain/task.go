@@ -17,3 +17,10 @@ func NewTask(taskID, taskName, dueDate, completed string) *Task {
 		Completed: completed,
 	}
 }
+
+type TaskManager interface {
+	CreateTask(task *Task, user *User) error
+	ReadTask(task *Task, user *User) error
+	UpdateTask(task *Task, user *User) error
+	DeleteTask(task *Task, user *User) error
+}

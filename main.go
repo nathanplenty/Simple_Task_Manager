@@ -7,16 +7,14 @@ import (
 )
 
 func main() {
-	log.Println("Start Application")
-
 	// Database path - Manually change
 	dbPath := "./database.db"
 
 	// Database type - Manually change
-	dbType := database.SQLiteDBType
+	dbType := "sqlite"
 
-	// Create database
-	db, err := database.CreateDatabase(dbType, dbPath)
+	// Create a new database instance based on the specified dbType
+	db, err := database.NewDatabase(database.SelectDatabaseType(dbType), dbPath)
 	if err != nil {
 		log.Fatalf("Failed to create database: %v", err)
 	}
@@ -29,4 +27,5 @@ func main() {
 	if err = srv.StartServer(8080); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
+
 }

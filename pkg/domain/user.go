@@ -15,3 +15,8 @@ func NewUser(userID, userName, password string) *User {
 		Password: password,
 	}
 }
+
+type UserManager interface {
+	CreateUser(user *User) error
+	CheckUser(user *User) error
+}
