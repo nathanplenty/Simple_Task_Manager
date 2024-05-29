@@ -4,10 +4,12 @@ import (
 	"Simple_Task_Manager/pkg/domain"
 	"database/sql"
 	"errors"
+	"github.com/golang-jwt/jwt"
 	_ "github.com/mattn/go-sqlite3"
 	"log"
 	"os"
 	"strconv"
+	"time"
 )
 
 // SQLiteDB represents the SQLite database
@@ -124,27 +126,48 @@ func (s *SQLiteDB) CreateUser(user *domain.User) error {
 }
 
 // LoginUser authenticates a user by checking username and password
-func (s *SQLiteDB) LoginUser(user *domain.User) error {
+func (s *SQLiteDB) LoginUser(user *domain.User) (string, error) {
 	log.Println("Start Function sqlite/LoginUser")
 
 	err := s.CheckUser(user)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return errors.New("user not found")
+			return "", errors.New("user not found")
 		}
-		return err
+		return "", err
+	}
+
+	token, err := s.CreateJWT(user)
+	if err != nil {
+		return "", err
 	}
 
 	err = s.CheckPassword(user)
 	if err != nil {
 		if errors.Is(err, errors.New("incorrect password")) {
-			return errors.New("wrong password")
+			return "", errors.New("wrong password")
 		}
-		return err
+		return "", err
 	}
 
-	log.Println("User logged in")
-	return nil
+	log.Println("User logged in with Token: ", token)
+	return token, nil
+}
+
+func (s *SQLiteDB) CreateJWT(user *domain.User) (string, error) {
+	signingKey := []byte("SECRET")
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"username": user.UserName,
+		"exp":      time.Now().Add(time.Hour * 24).Unix(),
+	})
+
+	tokenString, err := token.SignedString(signingKey)
+	if err != nil {
+		return "", err
+	}
+
+	return tokenString, nil
 }
 
 // CheckUser checks if a user exists in the SQLite database

@@ -64,19 +64,39 @@ func encodeJSON(w http.ResponseWriter, v interface{}) {
 	}
 }
 
-// handleRequest handles related requests.
+// handleRequestWithResult handles related requests and returns a result.
+func (s *Server) handleRequestWithResult(w http.ResponseWriter, r *http.Request, handler func(task domain.Task, user domain.User) (interface{}, error)) {
+	log.Println("Start Function router/handleRequestWithResult")
+
+	task, user, err := logBody(w, r)
+	if err != nil {
+		http.Error(w, "Failed to parse request body", http.StatusBadRequest)
+		return
+	}
+
+	result, err := handler(task, user)
+	if err != nil {
+		http.Error(w, "Failed to handle request: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	encodeJSON(w, result)
+}
+
+// handleRequest handles related requests and does not return a result.
 func (s *Server) handleRequest(w http.ResponseWriter, r *http.Request, handler func(task domain.Task, user domain.User) error) {
 	log.Println("Start Function router/handleRequest")
 
 	task, user, err := logBody(w, r)
 	if err != nil {
+		http.Error(w, "Failed to parse request body", http.StatusBadRequest)
 		return
 	}
 
 	err = handler(task, user)
-
 	if err != nil {
-		http.Error(w, "Failed to handle request", http.StatusInternalServerError)
+		http.Error(w, "Failed to handle request: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -93,12 +113,16 @@ func (s *Server) createUser(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// createUser handles the creation of a new user.
+// loginUser handles the login of a user.
 func (s *Server) loginUser(w http.ResponseWriter, r *http.Request) {
 	log.Println("Start Function router/loginUser")
-	s.handleRequest(w, r, func(task domain.Task, user domain.User) error {
+	s.handleRequestWithResult(w, r, func(task domain.Task, user domain.User) (interface{}, error) {
 		getUser := domain.NewUser(user.UserID, user.UserName, user.Password)
-		return s.DB.LoginUser(getUser)
+		token, err := s.DB.LoginUser(getUser)
+		if err != nil {
+			return nil, err
+		}
+		return map[string]string{"token": token}, nil
 	})
 }
 

@@ -68,8 +68,8 @@ func (m *MongoDB) CheckUser(user *domain.User) error {
 	return nil
 }
 
-func (m *MongoDB) LoginUser(user *domain.User) error {
-	return nil
+func (m *MongoDB) LoginUser(user *domain.User) (string, error) {
+	return "", nil
 }
 
 //// CreateTask creates a new task in the MongoDB database
