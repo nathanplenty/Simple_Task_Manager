@@ -48,8 +48,9 @@ func (m *MongoDB) CreateTask(task *domain.Task, user *domain.User) error {
 	return nil
 }
 
-func (m *MongoDB) ReadTask(task *domain.Task, user *domain.User) error {
-	return nil
+func (s *MongoDB) ReadTaskList() ([]*domain.Task, error) {
+	task := []*domain.Task{}
+	return task, nil
 }
 
 func (m *MongoDB) UpdateTask(task *domain.Task, user *domain.User) error {

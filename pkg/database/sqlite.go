@@ -245,21 +245,29 @@ func (s *SQLiteDB) CreateTask(task *domain.Task, user *domain.User) error {
 	return nil
 }
 
-// ReadTask reads a task from the SQLite database
-func (s *SQLiteDB) ReadTask(task *domain.Task, user *domain.User) error {
-	log.Println("Start Function sqlite/ReadTask")
+// ReadTaskList reads a task from the SQLite database
+func (s *SQLiteDB) ReadTaskList() ([]*domain.Task, error) {
+	rows, err := s.db.Query("SELECT task_id, task_name, due_date, completed FROM tasks")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
 
-	if err := s.CheckUser(user); err != nil {
-		return err
+	tasks := []*domain.Task{}
+
+	for rows.Next() {
+		task := &domain.Task{}
+		if err := rows.Scan(&task.TaskID, &task.TaskName, &task.DueDate, &task.Completed); err != nil {
+			return nil, err
+		}
+		tasks = append(tasks, task)
 	}
 
-	if err := s.CheckPassword(user); err != nil {
-		return err
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 
-	err := s.db.QueryRow("SELECT task_id, task_name, due_date, completed FROM tasks WHERE task_id=? AND user_id=(SELECT user_id FROM users WHERE user_name = ?)",
-		task.TaskID, user.UserName).Scan(&task.TaskID, &task.TaskName, &task.DueDate, &task.Completed)
-	return err
+	return tasks, nil
 }
 
 // UpdateTask updates a task in the SQLite database

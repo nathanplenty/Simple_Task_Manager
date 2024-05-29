@@ -139,7 +139,13 @@ func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 func (s *Server) readTask(w http.ResponseWriter, r *http.Request) {
 	log.Println("Start Function router/readTask")
 	s.handleRequest(w, r, func(task domain.Task, user domain.User) error {
-		return s.DB.ReadTask(&task, &user)
+		tasks, err := s.DB.ReadTaskList()
+		if err != nil {
+			return err
+		}
+
+		encodeJSON(w, tasks)
+		return nil
 	})
 }
 

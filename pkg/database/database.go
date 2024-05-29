@@ -11,7 +11,7 @@ type Database interface {
 	CheckUser(user *domain.User) error
 	LoginUser(user *domain.User) (string, error)
 	CreateTask(task *domain.Task, user *domain.User) error
-	ReadTask(task *domain.Task, user *domain.User) error
+	ReadTaskList() ([]*domain.Task, error)
 	UpdateTask(task *domain.Task, user *domain.User) error
 	DeleteTask(task *domain.Task, user *domain.User) error
 }
